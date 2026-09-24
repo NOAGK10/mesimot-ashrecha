@@ -21,16 +21,21 @@ function RoleSelect({ value, onChange }: { value: PersonRole; onChange: (r: Pers
   );
 }
 
-/** Job title edited in place; saved when the field loses focus. */
-function JobTitleInput({ person, onSave }: { person: PersonDto; onSave: (jobTitle: string | null) => void }) {
-  const [value, setValue] = useState(person.jobTitle ?? '');
+/** A text field edited in place; saved when it loses focus. Empty means null unless `required`. */
+function InlineInput({ initial, onSave, placeholder, required }: { initial: string; onSave: (v: string | null) => void; placeholder?: string; required?: boolean }) {
+  const [value, setValue] = useState(initial);
   return (
     <input
       value={value}
       maxLength={100}
-      placeholder="למשל: מגייס כספים"
+      placeholder={placeholder}
+      aria-label={placeholder}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={() => value.trim() !== (person.jobTitle ?? '') && onSave(value.trim() || null)}
+      onBlur={() => {
+        const v = value.trim();
+        if (required && !v) return setValue(initial);
+        if (v !== initial) onSave(v || null);
+      }}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
     />
   );
@@ -100,9 +105,11 @@ export function PeoplePage() {
         <tbody>
           {people.data?.map((p) => (
             <tr key={p.id} className={p.active ? '' : 'archived'}>
-              <td data-label="שם">{p.displayName}</td>
+              <td data-label="שם">
+                <InlineInput key={p.displayName} initial={p.displayName} required placeholder="שם" onSave={(v) => update.mutate({ p, patch: { displayName: v } })} />
+              </td>
               <td data-label="תפקיד בארגון">
-                <JobTitleInput key={p.jobTitle ?? ''} person={p} onSave={(t) => update.mutate({ p, patch: { jobTitle: t } })} />
+                <InlineInput key={p.jobTitle ?? ''} initial={p.jobTitle ?? ''} placeholder="למשל: מגייס כספים" onSave={(t) => update.mutate({ p, patch: { jobTitle: t } })} />
               </td>
               <td data-label="מייל" dir="ltr">
                 {p.email}

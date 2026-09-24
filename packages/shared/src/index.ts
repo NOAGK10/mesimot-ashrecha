@@ -206,6 +206,22 @@ export interface GoogleStatusDto {
 }
 export const googleConnectSchema = z.object({ code: z.string().min(10) });
 
+// ---- Organisation settings ----
+export const updateOrganizationSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  /** Local hour at which date reminders are sent. */
+  reminderHour: z.number().int().min(0).max(23).optional(),
+  /** Days before the due date for the "due soon" reminder; 0 turns it off. */
+  dueSoonDays: z.number().int().min(0).max(14).optional(),
+});
+export interface OrganizationDto {
+  id: string;
+  name: string;
+  timezone: string;
+  reminderHour: number;
+  dueSoonDays: number;
+}
+
 // ---- Auth ----
 export const googleLoginSchema = z.object({ credential: z.string().min(10) });
 export const devLoginSchema = z.object({ email: z.email() });

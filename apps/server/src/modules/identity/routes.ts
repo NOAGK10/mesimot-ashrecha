@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { createPersonSchema, devLoginSchema, googleLoginSchema, updatePersonSchema } from '@org/shared';
+import { createPersonSchema, devLoginSchema, googleLoginSchema, updateOrganizationSchema, updatePersonSchema } from '@org/shared';
 import type { AppContext } from '../../context';
 import { clearSessionCookie, requirePrincipal, SESSION_COOKIE, setSessionCookie } from '../../http';
 import { AppError } from '../../lib/errors';
@@ -13,6 +13,7 @@ import {
   logout,
   redeemMagicLink,
 } from './auth-service';
+import { getOrganizationSettings, updateOrganizationSettings } from './org';
 import { createPerson, listPeople, updatePerson } from './people-service';
 
 const idParam = z.object({ id: z.uuid() });
@@ -58,6 +59,11 @@ export function identityRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.get('/api/me', async (req) => describePrincipal(ctx, requirePrincipal(req)));
+
+  app.get('/api/organization', async (req) => getOrganizationSettings(ctx, requirePrincipal(req)));
+  app.patch('/api/organization', async (req) =>
+    updateOrganizationSettings(ctx, requirePrincipal(req), parse(updateOrganizationSchema, req.body)),
+  );
 
   app.get('/api/people', async (req) => listPeople(ctx, requirePrincipal(req)));
   app.post('/api/people', async (req, reply) => {

@@ -75,3 +75,5 @@ Still open for Phase 2: R-04 (document moved/deleted/access revoked — currentl
 | C-4 | Status note | **APPROVED** | Any status change may carry a note (≤ 2000 chars), stored in the audit event and shown on the task while it stays in that status. |
 | C-5 | View tabs | **APPROVED** | הכל · להיום · לשבוע הזה · באיחור · משבוע הבא והלאה · בלי תאריך יעד. |
 | C-6 | Status screen | **APPROVED** | Moved from the main navigation into the name menu; a red dot appears only when the worker is unhealthy or notifications are failing/backlogged. |
+| C-7 | Organisation name | **APPROVED** | "אשריך". Editable by managers in the new Settings page (with reminder hour and "due soon" days; changing timing re-plans pending reminders). |
+| C-8 | People's names and job titles | **APPROVED** — change often | Not fixed in code: managers edit names and job titles inline on the People page. |

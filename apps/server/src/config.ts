@@ -34,7 +34,7 @@ const envSchema = z.object({
   MAIL_FROM: z.string().default('Organization Tasks <no-reply@example.org>'),
   /** Comma-separated e-mails that become managers when the database is seeded. */
   BOOTSTRAP_MANAGER_EMAILS: z.string().default(''),
-  BOOTSTRAP_ORG_NAME: z.string().default('הארגון'),
+  BOOTSTRAP_ORG_NAME: z.string().default('אשריך'),
   WEB_DIST_DIR: z.string().optional(),
 });
 

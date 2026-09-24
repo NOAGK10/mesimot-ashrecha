@@ -1,4 +1,5 @@
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, useMe } from './api';
 import { LoginPage } from './pages/LoginPage';
@@ -11,10 +12,15 @@ import { OpsPage } from './pages/OpsPage';
 import { DevOutboxPage } from './pages/DevOutboxPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { ImportPage } from './pages/ImportPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export function App() {
   const me = useMe();
   const location = useLocation();
+  const orgName = me.data?.organization.name;
+  useEffect(() => {
+    document.title = orgName ? `${orgName} · משימות` : 'משימות';
+  }, [orgName]);
 
   if (location.pathname === '/link-expired') return <LinkExpired />;
   if (me.isLoading) return <div className="center muted">טוען…</div>;
@@ -65,6 +71,7 @@ export function App() {
           {isManager && <Route path="/import" element={<ImportPage />} />}
           {isManager && <Route path="/people" element={<PeoplePage />} />}
           {isManager && <Route path="/ops" element={<OpsPage />} />}
+          {isManager && <Route path="/settings" element={<SettingsPage />} />}
           <Route path="*" element={<Navigate to="/my" replace />} />
         </Routes>
       </main>
@@ -94,6 +101,11 @@ function UserMenu({ name, isManager }: { name: string; isManager: boolean }) {
         {problem && <span className="alert-dot" title="יש תקלה במערכת" />} ▾
       </summary>
       <div className="menu">
+        {isManager && (
+          <Link to="/settings" onClick={(e) => e.currentTarget.closest('details')?.removeAttribute('open')}>
+            הגדרות
+          </Link>
+        )}
         {isManager && (
           <Link to="/ops" onClick={(e) => e.currentTarget.closest('details')?.removeAttribute('open')}>
             מצב המערכת{problem && ' ⚠'}

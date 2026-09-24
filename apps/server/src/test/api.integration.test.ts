@@ -142,6 +142,21 @@ describe('HTTP API', () => {
     expect(cleared.json().jobTitle).toBeNull();
   });
 
+  it('managers edit organisation settings; new reminder hour re-plans pending reminders', async () => {
+    const cookie = await login('boss@example.org');
+    const task = (
+      await app.inject({ method: 'POST', url: '/api/tasks', headers: { ...JSON_HEADERS, cookie }, payload: { title: 'Settings test', ownerPersonId: h.partner.personId, dueDate: '2026-10-20' } })
+    ).json();
+    const res = await app.inject({ method: 'PATCH', url: '/api/organization', headers: { ...JSON_HEADERS, cookie }, payload: { name: 'אשריך', reminderHour: 8 } });
+    expect(res.json()).toMatchObject({ name: 'אשריך', reminderHour: 8 });
+    const dueToday = (await h.ctx.db.select().from(notifications).where(eq(notifications.taskId, task.id))).filter((n) => n.kind === 'due_today');
+    expect(dueToday.length).toBeGreaterThan(0);
+    expect(new Set(dueToday.map((n) => n.sendAt.toISOString()))).toEqual(new Set(['2026-10-20T05:00:00.000Z'])); // 08:00 Jerusalem
+    expect((await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json().organization.name).toBe('אשריך');
+    const guest = await login('guest@example.org');
+    expect((await app.inject({ method: 'PATCH', url: '/api/organization', headers: { ...JSON_HEADERS, cookie: guest }, payload: { name: 'x' } })).statusCode).toBe(403);
+  });
+
   it('health endpoints', async () => {
     expect((await app.inject({ method: 'GET', url: '/healthz' })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/readyz' })).statusCode).toBe(200);
