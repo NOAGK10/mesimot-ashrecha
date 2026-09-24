@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import type { TaskDetailDto } from '@org/shared';
 import { api, useApiMutation, useDocuments, useMe, useTask } from '../api';
 import { AddDocument, KIND_ICON, KIND_LABEL } from '../components/AddDocument';
-import { ErrorText, PeopleChecklist, PersonSelect, StatusBadge, usePeopleMap } from '../components/common';
+import { ErrorText, PeopleChecklist, PersonSelect, PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { EVENT_LABEL, STATUS_LABEL, formatDate, formatDateTime, transitionLabel } from '../he';
 
 export function TaskDetailPage() {
@@ -17,6 +17,7 @@ export function TaskDetailPage() {
   if (task.error || !task.data) return <ErrorText error={task.error ?? new Error()} />;
   const t = task.data;
   const name = (pid: string | null) => (pid ? (t.names[pid] ?? people.name(pid)) : 'המערכת');
+  const statusNote = latestStatusNote(t);
 
   return (
     <section className="detail">
@@ -32,15 +33,21 @@ export function TaskDetailPage() {
         </div>
         {t.archivedAt && <p className="notice">המשימה בארכיון ואינה ניתנת לעריכה.</p>}
         <dl className="facts">
-          <dt>אחראי/ת</dt>
-          <dd>{name(t.ownerPersonId)}</dd>
+          <dt>אחראי</dt>
+          <dd>
+            <PersonTag name={name(t.ownerPersonId)} jobTitle={t.jobTitles[t.ownerPersonId]} />
+          </dd>
           <dt>מועד יעד</dt>
           <dd className={t.isOverdue ? 'overdue' : ''}>
             {formatDate(t.dueDate)}
             {t.isOverdue && ' · באיחור'}
           </dd>
           <dt>משתתפים</dt>
-          <dd>{t.participantIds.length ? t.participantIds.map(name).join(', ') : '—'}</dd>
+          <dd className="people-list">
+            {t.participantIds.length
+              ? t.participantIds.map((pid) => <PersonTag key={pid} name={name(pid)} jobTitle={t.jobTitles[pid]} />)
+              : '—'}
+          </dd>
           {t.recurrenceDefinitionId && (
             <>
               <dt>חזרתיות</dt>
@@ -49,6 +56,12 @@ export function TaskDetailPage() {
           )}
         </dl>
         {t.description && <p className="description">{t.description}</p>}
+        {statusNote && (
+          <p className={`status-note status-${t.status}`}>
+            <strong>{STATUS_LABEL[t.status]}:</strong> {statusNote.note}
+            <span className="muted small"> · {formatDateTime(statusNote.at)}</span>
+          </p>
+        )}
         <StatusActions task={t} />
       </div>
 
@@ -74,7 +87,13 @@ export function TaskDetailPage() {
 
 function EventDetail({ type, data, name }: { type: string; data: Record<string, unknown>; name: (id: string | null) => string }) {
   const d = data as Record<string, string | null | string[]>;
-  if (type === 'task.status_changed') return <> ({STATUS_LABEL[d.from as keyof typeof STATUS_LABEL]} ← {STATUS_LABEL[d.to as keyof typeof STATUS_LABEL]})</>;
+  if (type === 'task.status_changed')
+    return (
+      <>
+        {' '}({STATUS_LABEL[d.from as keyof typeof STATUS_LABEL]} ← {STATUS_LABEL[d.to as keyof typeof STATUS_LABEL]})
+        {d.note && <div className="history-note">„{d.note as string}”</div>}
+      </>
+    );
   if (type === 'task.owner_changed') return <> ({name(d.from as string)} ← {name(d.to as string)})</>;
   if (type === 'task.due_date_changed') return <> ({formatDate(d.from as string | null)} ← {formatDate(d.to as string | null)})</>;
   return null;
@@ -147,19 +166,47 @@ function TaskDocuments({ task }: { task: TaskDetailDto }) {
   );
 }
 
+/** Status buttons with an optional note that is saved with the change (e.g. why the task is stuck). */
 function StatusActions({ task }: { task: TaskDetailDto }) {
-  const change = useApiMutation((status: string) => api('POST', `/api/tasks/${task.id}/status`, { version: task.version, status }));
+  const [note, setNote] = useState('');
+  const change = useApiMutation((status: string) =>
+    api('POST', `/api/tasks/${task.id}/status`, { version: task.version, status, ...(note.trim() ? { note: note.trim() } : {}) }),
+  );
   if (task.allowedStatuses.length === 0) return null;
   return (
-    <div className="actions">
-      {task.allowedStatuses.map((s) => (
-        <button key={s} className={s === 'completed' ? '' : 'secondary'} disabled={change.isPending} onClick={() => change.mutate(s)}>
-          {transitionLabel(task.status, s)}
-        </button>
-      ))}
+    <div className="status-box">
+      <label>
+        הערה לעדכון (לא חובה)
+        <textarea
+          rows={2}
+          maxLength={2000}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="למשל: למה זה תקוע, על מה מחכים, מה נעשה"
+        />
+      </label>
+      <div className="actions">
+        {task.allowedStatuses.map((s) => (
+          <button
+            key={s}
+            className={s === 'completed' ? '' : s === 'blocked' ? 'secondary warn' : 'secondary'}
+            disabled={change.isPending}
+            onClick={() => change.mutate(s, { onSuccess: () => setNote('') })}
+          >
+            {transitionLabel(task.status, s)}
+          </button>
+        ))}
+      </div>
       <ErrorText error={change.error} />
     </div>
   );
+}
+
+/** The note written with the most recent status change, if the task is still in that status. */
+function latestStatusNote(task: TaskDetailDto): { note: string; at: string } | null {
+  const last = [...task.events].reverse().find((e) => e.type === 'task.status_changed');
+  const note = last?.data.note;
+  return last && typeof note === 'string' && last.data.to === task.status ? { note, at: last.createdAt } : null;
 }
 
 function EditTask({ task }: { task: TaskDetailDto }) {
@@ -212,7 +259,7 @@ function EditTask({ task }: { task: TaskDetailDto }) {
       </label>
       <div className="row">
         <label>
-          אחראי/ת
+          אחראי
           <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
         </label>
         <label>

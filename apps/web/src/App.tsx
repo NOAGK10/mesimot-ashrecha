@@ -1,5 +1,5 @@
-import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, useMe } from './api';
 import { LoginPage } from './pages/LoginPage';
 import { TasksPage } from './pages/TasksPage';
@@ -51,9 +51,8 @@ export function App() {
           {isManager && <NavLink to="/recurring">משימות חוזרות</NavLink>}
           {isManager && <NavLink to="/documents">מסמכים</NavLink>}
           {isManager && <NavLink to="/people">אנשים</NavLink>}
-          {isManager && <NavLink to="/ops">מצב המערכת</NavLink>}
         </nav>
-        <UserMenu name={me.data.displayName} />
+        <UserMenu name={me.data.displayName} isManager={isManager} />
       </header>
       <main className="content">
         <Routes>
@@ -73,20 +72,38 @@ export function App() {
   );
 }
 
-function UserMenu({ name }: { name: string }) {
+/** Name menu. Managers find the technical status screen here; a red dot appears only when something is wrong. */
+function UserMenu({ name, isManager }: { name: string; isManager: boolean }) {
   const qc = useQueryClient();
+  const ops = useQuery({
+    queryKey: ['ops'],
+    queryFn: () => api<{ worker: { healthy: boolean }; backlogOlderThan15Min: number; recentFailures: unknown[] }>('GET', '/api/ops/status'),
+    enabled: isManager,
+    refetchInterval: 60_000,
+  });
+  const problem = Boolean(ops.data && (!ops.data.worker.healthy || ops.data.backlogOlderThan15Min > 0 || ops.data.recentFailures.length > 0));
   const logout = async () => {
     await api('POST', '/api/auth/logout');
     qc.clear();
     window.location.href = '/';
   };
   return (
-    <div className="user">
-      <span className="small">{name}</span>
-      <button className="link" onClick={logout}>
-        יציאה
-      </button>
-    </div>
+    <details className="user-menu">
+      <summary>
+        {name}
+        {problem && <span className="alert-dot" title="יש תקלה במערכת" />} ▾
+      </summary>
+      <div className="menu">
+        {isManager && (
+          <Link to="/ops" onClick={(e) => e.currentTarget.closest('details')?.removeAttribute('open')}>
+            מצב המערכת{problem && ' ⚠'}
+          </Link>
+        )}
+        <button className="link" onClick={logout}>
+          יציאה
+        </button>
+      </div>
+    </details>
   );
 }
 
@@ -94,7 +111,7 @@ function LinkExpired() {
   return (
     <div className="center card narrow">
       <h1>הקישור אינו בתוקף</h1>
-      <p className="muted">ייתכן שפג תוקפו או שהמשימה כבר אינה משויכת אליך. אפשר לפנות למנהל/ת הארגון לקבלת קישור חדש.</p>
+      <p className="muted">ייתכן שפג תוקפו או שהמשימה כבר אינה משויכת אליך. אפשר לפנות למנהל הארגון לקבלת קישור חדש.</p>
     </div>
   );
 }

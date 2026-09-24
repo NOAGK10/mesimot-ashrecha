@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { TaskStatus, TaskView } from '@org/shared';
 import { TASK_STATUSES, TASK_VIEWS } from '@org/shared';
 import { useMe, useTasks } from '../api';
-import { StatusBadge, usePeopleMap } from '../components/common';
+import { PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { STATUS_LABEL, VIEW_LABEL, formatDate } from '../he';
 
 export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
@@ -49,7 +49,7 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
       <div className="filters">
         {scope === 'all' && (
           <label>
-            אחראי/ת
+            אחראי
             <select value={owner} onChange={(e) => setOwner(e.target.value)}>
               <option value="">כולם</option>
               {people.list.map((p) => (
@@ -86,7 +86,7 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
           <thead>
             <tr>
               <th>משימה</th>
-              <th>אחראי/ת</th>
+              <th>אחראי</th>
               <th>יעד</th>
               <th>סטטוס</th>
             </tr>
@@ -99,7 +99,9 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
                   {t.recurrenceDefinitionId && <span className="tag" title="משימה חוזרת">↻</span>}
                   {t.archivedAt && <span className="tag">ארכיון</span>}
                 </td>
-                <td data-label="אחראי/ת">{people.name(t.ownerPersonId)}</td>
+                <td data-label="אחראי">
+                  <PersonTag name={people.name(t.ownerPersonId)} jobTitle={people.jobTitle(t.ownerPersonId)} />
+                </td>
                 <td data-label="יעד" className={t.isOverdue ? 'overdue' : ''}>
                   {formatDate(t.dueDate)}
                   {t.isOverdue && ' · באיחור'}

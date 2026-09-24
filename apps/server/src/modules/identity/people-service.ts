@@ -17,6 +17,7 @@ function toDto(r: PersonRow, withEmail: boolean): PersonDto {
     displayName: r.displayName,
     email: withEmail ? r.email : '',
     role: r.role,
+    jobTitle: r.jobTitle,
     active: r.deactivatedAt === null,
     hasLogin: r.userId !== null,
   };

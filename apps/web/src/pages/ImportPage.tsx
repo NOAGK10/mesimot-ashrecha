@@ -17,7 +17,7 @@ import { STATUS_LABEL, formatDate } from '../he';
 type Field = 'title' | 'owner' | 'due' | 'status' | 'description' | 'participants';
 const FIELD_LABEL: Record<Field, string> = {
   title: 'מה צריך לעשות (חובה)',
-  owner: 'אחראי/ת',
+  owner: 'אחראי',
   due: 'תאריך יעד',
   status: 'בוצע / סטטוס',
   description: 'פרטים / הערות',
@@ -47,7 +47,8 @@ function matchPerson(value: string, people: PersonDto[]): string {
 function guessStatus(value: string): TaskStatus {
   if (looksDone(value)) return 'completed';
   if (/בתהליך|בביצוע|in progress|עובדים/i.test(value)) return 'in_progress';
-  if (/ממתין|מחכה|waiting|blocked|תקוע/i.test(value)) return 'waiting';
+  if (/ממתין|מחכה|waiting/i.test(value)) return 'waiting';
+  if (/תקוע|חסום|blocked|stuck|בעיה/i.test(value)) return 'blocked';
   if (/בוטל|cancel/i.test(value)) return 'cancelled';
   return 'new';
 }
@@ -348,7 +349,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
       <div className="card stack">
         <h2>2. אנשים וסטטוסים</h2>
         <label className="inline">
-          אחראי/ת לשורות בלי אחראי
+          אחראי לשורות בלי אחראי
           <PersonPicker people={people.data ?? []} value={defaultOwner} onChange={setDefaultOwner} />
         </label>
         {nameValues.length > 0 && (
@@ -428,7 +429,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
                 </th>
                 <th>שורה</th>
                 <th>משימה</th>
-                <th>אחראי/ת</th>
+                <th>אחראי</th>
                 <th>יעד</th>
                 <th>סטטוס</th>
                 <th>הערות</th>

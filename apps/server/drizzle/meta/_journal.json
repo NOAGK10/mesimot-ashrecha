@@ -15,6 +15,13 @@
       "when": 1790290362694,
       "tag": "0001_documents_and_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790291723488,
+      "tag": "0002_blocked_status_job_title",
+      "breakpoints": true
     }
   ]
 }

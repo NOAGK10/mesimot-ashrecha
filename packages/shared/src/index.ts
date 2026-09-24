@@ -2,9 +2,9 @@
 // this package holds only vocabulary and request/response shapes.
 import { z } from 'zod';
 
-export const TASK_STATUSES = ['new', 'in_progress', 'waiting', 'completed', 'cancelled'] as const;
+export const TASK_STATUSES = ['new', 'in_progress', 'waiting', 'blocked', 'completed', 'cancelled'] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
-export const OPEN_STATUSES: readonly TaskStatus[] = ['new', 'in_progress', 'waiting'];
+export const OPEN_STATUSES: readonly TaskStatus[] = ['new', 'in_progress', 'waiting', 'blocked'];
 
 export const PERSON_ROLES = ['manager', 'guest'] as const;
 /** null role = contact without login (email / magic link only). */
@@ -25,8 +25,12 @@ export const createPersonSchema = z.object({
   displayName: z.string().trim().min(1).max(200),
   email: z.email().max(320),
   role: z.enum(PERSON_ROLES).nullable(),
+  /** Job in the organisation, shown as a tag (e.g. 'מגייס כספים'). Not an access level. */
+  jobTitle: z.string().trim().max(100).nullable().default(null),
 });
 export const updatePersonSchema = createPersonSchema.partial().extend({
+  // Explicit: a partial update must never reset the job title through the create-schema default.
+  jobTitle: z.string().trim().max(100).nullable().optional(),
   active: z.boolean().optional(),
 });
 
@@ -48,6 +52,8 @@ export const updateTaskSchema = z.object({
 export const changeStatusSchema = z.object({
   version: z.number().int().positive(),
   status: z.enum(TASK_STATUSES),
+  /** Optional explanation, kept in the task history (e.g. why it is stuck). */
+  note: z.string().trim().max(2000).optional(),
 });
 export const setParticipantsSchema = z.object({
   version: z.number().int().positive(),
@@ -210,6 +216,7 @@ export interface PersonDto {
   displayName: string;
   email: string;
   role: PersonRole;
+  jobTitle: string | null;
   active: boolean;
   hasLogin: boolean;
 }
@@ -244,6 +251,7 @@ export interface TaskDetailDto extends TaskDto {
   events: AuditEventDto[];
   /** Display names of everyone referenced by this task and its history. */
   names: Record<string, string>;
+  jobTitles: Record<string, string>;
   documents: DocumentDto[];
 }
 export interface RecurrenceDto {

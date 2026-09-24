@@ -90,7 +90,7 @@ async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMe
 
   // People with a login open the app; contacts without one get a task-scoped magic link.
   const url = person.role === null ? await issueMagicLink(ctx, ctx.db, person.id, task.id) : `${ctx.config.APP_URL}/tasks/${task.id}`;
-  const role = task.ownerPersonId === person.id ? 'אחראי/ת' : 'משתתף/ת';
+  const role = task.ownerPersonId === person.id ? 'אחראי' : 'משתתף';
   const subject = SUBJECTS[n.kind](task.title);
   const lines = [`שלום ${person.displayName},`, '', INTROS[n.kind], '', `משימה: ${task.title}`, `תפקידך: ${role}`, `יעד: ${formatDate(task.dueDate)}`, '', `לצפייה במשימה: ${url}`];
   const html = `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.6">

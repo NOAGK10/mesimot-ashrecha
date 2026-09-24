@@ -30,8 +30,8 @@ export async function seedDemo(ctx: AppContext, orgId: string): Promise<void> {
   const as: Principal = { personId: manager!.id, orgId, access: 'manager', scopeTaskId: null, via: 'session' };
   const today = todayIn('Asia/Jerusalem', ctx.now());
 
-  const dana = await createPerson(ctx, as, { displayName: 'דנה לוי', email: 'dana@example.org', role: 'guest' });
-  const yossi = await createPerson(ctx, as, { displayName: 'יוסי כהן (ללא חשבון)', email: 'yossi@example.org', role: null });
+  const dana = await createPerson(ctx, as, { displayName: 'דנה לוי', email: 'dana@example.org', role: 'guest', jobTitle: 'מגייסת כספים' });
+  const yossi = await createPerson(ctx, as, { displayName: 'יוסי כהן', email: 'yossi@example.org', role: null, jobTitle: 'ספק' });
 
   await createTask(ctx, as, { title: 'להכין דוח רבעוני', description: 'סיכום פעילות הרבעון להנהלה', ownerPersonId: manager!.id, dueDate: today, participantIds: [dana.id] });
   await createTask(ctx, as, { title: 'לחדש ביטוח משרד', description: '', ownerPersonId: manager!.id, dueDate: addDays(today, -2), participantIds: [] });

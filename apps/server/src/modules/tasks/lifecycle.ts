@@ -7,9 +7,11 @@ import { invalid } from '../../lib/errors';
  * Archiving is not a status; it is the separate `archived_at` flag.
  */
 const TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
-  new: ['in_progress', 'waiting', 'completed', 'cancelled'],
-  in_progress: ['waiting', 'completed', 'cancelled'],
-  waiting: ['in_progress', 'completed', 'cancelled'],
+  new: ['in_progress', 'waiting', 'blocked', 'completed', 'cancelled'],
+  in_progress: ['waiting', 'blocked', 'completed', 'cancelled'],
+  // waiting = depends on someone/something else; blocked = there is a problem that stops the work.
+  waiting: ['in_progress', 'blocked', 'completed', 'cancelled'],
+  blocked: ['in_progress', 'waiting', 'completed', 'cancelled'],
   completed: ['in_progress'], // reopen
   cancelled: ['new'], // restore
 };

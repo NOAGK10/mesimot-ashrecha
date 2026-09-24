@@ -10,8 +10,24 @@ export function StatusBadge({ status }: { status: TaskStatus }) {
 export function usePeopleMap(enabled = true) {
   const people = usePeople(enabled);
   const map = new Map<string, PersonDto>((people.data ?? []).map((p) => [p.id, p]));
-  return { list: people.data ?? [], name: (id: string) => map.get(id)?.displayName ?? '—' };
+  return {
+    list: people.data ?? [],
+    name: (id: string) => map.get(id)?.displayName ?? '—',
+    jobTitle: (id: string) => map.get(id)?.jobTitle ?? null,
+  };
 }
+
+/** A person's name with their job in the organisation as a small tag. */
+export function PersonTag({ name, jobTitle }: { name: string; jobTitle?: string | null }) {
+  return (
+    <span className="person">
+      {name}
+      {jobTitle && <span className="job-tag">{jobTitle}</span>}
+    </span>
+  );
+}
+
+const optionLabel = (p: PersonDto) => (p.jobTitle ? `${p.displayName} · ${p.jobTitle}` : p.displayName);
 
 export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
@@ -44,7 +60,7 @@ export function PersonSelect({
         .filter((p) => p.active)
         .map((p) => (
           <option key={p.id} value={p.id}>
-            {p.displayName}
+            {optionLabel(p)}
           </option>
         ))}
     </select>
@@ -73,7 +89,7 @@ export function PeopleChecklist({
             checked={selected.includes(p.id)}
             onChange={(e) => onChange(e.target.checked ? [...selected, p.id] : selected.filter((x) => x !== p.id))}
           />
-          {p.displayName}
+          <PersonTag name={p.displayName} jobTitle={p.jobTitle} />
         </label>
       ))}
     </div>

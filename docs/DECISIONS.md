@@ -64,3 +64,14 @@ Started at the product owner's request before Phase 1 was in real use (the basel
 | P2-8 | Google credentials | PROPOSED | Authorization-code popup; refresh token exchanged and stored **server-side, AES-256-GCM encrypted**. The browser only receives a short-lived access token for the Picker (baseline §20 "no privileged Google access from frontend" — the Picker token is user-scoped and short-lived). |
 
 Still open for Phase 2: R-04 (document moved/deleted/access revoked — currently the link simply stops working), whether guests should see a document library, and whether sheets should ever be written back to (would be a baseline change).
+
+# Content pass (product owner)
+
+| ID | Topic | Status | Decision |
+|---|---|---|---|
+| C-1 | Wording | **APPROVED** | Plain wording without slash forms ("אחראי", "מנהל", "אורח", "איש קשר"). |
+| C-2 | Job titles | **APPROVED** | Each person has an optional free-text job title (e.g. "מגייס כספים"), shown as a tag next to their name. It is not an access level. |
+| C-3 | Statuses | **APPROVED** — supersedes D5 vocabulary | חדש · בביצוע · ממתין · **תקוע** (`blocked`, new) · הושלם · בוטל. `blocked` is open and behaves like `waiting` (reminders continue, can be overdue). |
+| C-4 | Status note | **APPROVED** | Any status change may carry a note (≤ 2000 chars), stored in the audit event and shown on the task while it stays in that status. |
+| C-5 | View tabs | **APPROVED** | הכל · להיום · לשבוע הזה · באיחור · משבוע הבא והלאה · בלי תאריך יעד. |
+| C-6 | Status screen | **APPROVED** | Moved from the main navigation into the name menu; a red dot appears only when the worker is unhealthy or notifications are failing/backlogged. |

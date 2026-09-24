@@ -119,7 +119,7 @@ export async function changeStatus(ctx: AppContext, p: Principal, id: string, in
 
     const completing = input.status === 'completed';
     await bump(tx, id, { status: input.status, completedAt: completing ? now : null }, now);
-    await recordAudit(tx, { orgId: p.orgId, entityType: 'task', entityId: id, type: 'task.status_changed', actor: actorOf(p), data: { from: task.status, to: input.status } });
+    await recordAudit(tx, { orgId: p.orgId, entityType: 'task', entityId: id, type: 'task.status_changed', actor: actorOf(p), data: { from: task.status, to: input.status, ...(input.note ? { note: input.note } : {}) } });
 
     const updated = (await loadTask(tx, id))!;
     if (isOpen(input.status)) await replanReminders(tx, reminderTarget(updated), now);
@@ -231,7 +231,7 @@ export async function getTaskDetail(ctx: AppContext, p: Principal, id: string): 
   const ids = [task.ownerPersonId, ...task.participantIds, ...events.flatMap((e) => (e.actorPersonId ? [e.actorPersonId] : []))];
   for (const e of events) if (e.type === 'task.owner_changed') ids.push(String(e.data.from), String(e.data.to));
   const named = await ctx.db
-    .select({ id: people.id, displayName: people.displayName })
+    .select({ id: people.id, displayName: people.displayName, jobTitle: people.jobTitle })
     .from(people)
     .where(and(eq(people.orgId, p.orgId), inArray(people.id, [...new Set(ids)])));
   return {
@@ -240,6 +240,7 @@ export async function getTaskDetail(ctx: AppContext, p: Principal, id: string): 
     canEdit: policy.canEditTask(p, task),
     events,
     names: Object.fromEntries(named.map((n) => [n.id, n.displayName])),
+    jobTitles: Object.fromEntries(named.flatMap((n) => (n.jobTitle ? [[n.id, n.jobTitle]] : []))),
     documents: await documentsOfTask(ctx.db, id),
   };
 }

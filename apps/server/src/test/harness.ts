@@ -48,8 +48,8 @@ export async function createHarness() {
     via: access === 'link' ? 'magic_link' : 'session',
   });
   const manager = principal(boss!.id);
-  const guestPerson = await createPerson(ctx, manager, { displayName: 'Guest', email: 'guest@example.org', role: 'guest' });
-  const contactPerson = await createPerson(ctx, manager, { displayName: 'Contact', email: 'contact@example.org', role: null });
+  const guestPerson = await createPerson(ctx, manager, { displayName: 'Guest', email: 'guest@example.org', role: 'guest', jobTitle: null });
+  const contactPerson = await createPerson(ctx, manager, { displayName: 'Contact', email: 'contact@example.org', role: null, jobTitle: 'רכזת מתנדבים' });
 
   return {
     ctx,

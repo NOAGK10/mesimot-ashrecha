@@ -166,3 +166,25 @@ select.unmatched { border-color: var(--danger); }
   .task-table.review td { display: table-cell; }
   .task-table.review td::before { content: none; }
 }
+
+/* ---- Content pass: statuses, notes, job titles, user menu ---- */
+.status-blocked { background: #fde2e1; color: #9b1c1c; }
+button.secondary.warn { color: var(--danger); border-color: var(--danger); }
+.status-box { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.status-box .actions { margin-top: 0.25rem; }
+.status-note { padding: 0.5rem 0.75rem; border-radius: 8px; margin: 0.5rem 0 0; }
+.history-note { color: var(--muted); font-size: 0.9rem; padding-inline-start: 1rem; }
+.person { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.job-tag { font-size: 0.72rem; background: var(--bg); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 0 0.5rem; white-space: nowrap; }
+.people-list { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; }
+.legend { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 1rem; margin-bottom: 1rem; }
+.legend p { margin: 0.2rem 0; }
+.user-menu { position: relative; }
+.user-menu summary { cursor: pointer; list-style: none; font-size: 0.9rem; display: flex; align-items: center; gap: 0.35rem; }
+.user-menu summary::-webkit-details-marker { display: none; }
+.user-menu .menu { position: absolute; inset-inline-end: 0; top: 1.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; min-width: 150px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.08); z-index: 10; }
+.user-menu .menu a { text-decoration: none; color: var(--text); }
+.alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); display: inline-block; }
+@media (prefers-color-scheme: dark) {
+  .status-blocked { background: #4a1d1d; color: #ffb4ab; }
+}

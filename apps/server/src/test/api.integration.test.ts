@@ -134,6 +134,14 @@ describe('HTTP API', () => {
     expect((await app.inject({ method: 'GET', url: '/api/ops/status', headers: { cookie: guest } })).statusCode).toBe(403);
   });
 
+  it('updating a person without jobTitle keeps the existing job title', async () => {
+    const cookie = await login('boss@example.org');
+    const res = await app.inject({ method: 'PATCH', url: `/api/people/${h.contactId}`, headers: { ...JSON_HEADERS, cookie }, payload: { displayName: 'Contact 2' } });
+    expect(res.json()).toMatchObject({ displayName: 'Contact 2', jobTitle: 'רכזת מתנדבים' });
+    const cleared = await app.inject({ method: 'PATCH', url: `/api/people/${h.contactId}`, headers: { ...JSON_HEADERS, cookie }, payload: { jobTitle: null } });
+    expect(cleared.json().jobTitle).toBeNull();
+  });
+
   it('health endpoints', async () => {
     expect((await app.inject({ method: 'GET', url: '/healthz' })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/readyz' })).statusCode).toBe(200);

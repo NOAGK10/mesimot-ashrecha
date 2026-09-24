@@ -24,7 +24,7 @@ export function LoginPage() {
 
   const done = () => qc.invalidateQueries({ queryKey: ['me'] });
   const fail = (e: unknown) =>
-    setError(e instanceof ApiError && e.status === 403 ? 'לחשבון הזה אין גישה לארגון. פנו למנהל/ת.' : 'ההתחברות נכשלה.');
+    setError(e instanceof ApiError && e.status === 403 ? 'לחשבון הזה אין גישה לארגון. פנו למנהל.' : 'ההתחברות נכשלה.');
 
   const clientId = config.data?.googleClientId;
   useEffect(() => {

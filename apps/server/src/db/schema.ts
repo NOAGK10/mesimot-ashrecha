@@ -73,6 +73,7 @@ export const people = pgTable(
     displayName: text('display_name').notNull(),
     email: text('email').notNull(),
     role: personRole('role'),
+    jobTitle: text('job_title'),
     deactivatedAt: ts('deactivated_at'),
     createdAt: createdAt(),
   },

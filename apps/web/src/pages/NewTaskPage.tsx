@@ -39,7 +39,7 @@ export function NewTaskPage() {
         </label>
         <div className="row">
           <label>
-            אחראי/ת
+            אחראי
             <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
           </label>
           <label>

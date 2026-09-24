@@ -54,6 +54,26 @@ describe('task management', () => {
     ]);
   });
 
+  it('supports "blocked" as an open status and keeps the status note in the history', async () => {
+    const t = await createTask(h.ctx, h.manager, { ...base, title: 'Stuck', ownerPersonId: h.partner.personId, dueDate: '2026-10-20' });
+    const b = await changeStatus(h.ctx, h.manager, t.id, { version: t.version, status: 'blocked', note: 'מחכים לאישור תקציב' });
+    expect(b.status).toBe('blocked');
+    // Still open: reminders stay planned and it counts as overdue when late.
+    expect((await h.ctx.db.select().from(notifications).where(eq(notifications.taskId, t.id))).some((n) => n.kind === 'due_today')).toBe(true);
+    await changeStatus(h.ctx, h.manager, t.id, { version: b.version, status: 'in_progress' });
+    const detail = await getTaskDetail(h.ctx, h.manager, t.id);
+    expect(detail.events.filter((e) => e.type === 'task.status_changed').map((e) => e.data)).toEqual([
+      { from: 'new', to: 'blocked', note: 'מחכים לאישור תקציב' },
+      { from: 'blocked', to: 'in_progress' },
+    ]);
+  });
+
+  it('shows job titles of the people on a task', async () => {
+    const t = await createTask(h.ctx, h.manager, { ...base, title: 'Titles', ownerPersonId: h.contactId, dueDate: null });
+    const detail = await getTaskDetail(h.ctx, h.manager, t.id);
+    expect(detail.jobTitles[h.contactId]).toBe('רכזת מתנדבים');
+  });
+
   it('rejects stale writes (optimistic concurrency)', async () => {
     const t = await createTask(h.ctx, h.manager, { ...base, title: 'Race', ownerPersonId: h.manager.personId, dueDate: null });
     await updateTask(h.ctx, h.manager, t.id, { version: t.version, title: 'Race 2' });

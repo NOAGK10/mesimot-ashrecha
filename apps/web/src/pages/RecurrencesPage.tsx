@@ -43,7 +43,7 @@ export function RecurrencesPage() {
             </div>
             <p>{describe(r)}</p>
             <p className="muted small">
-              אחראי/ת: {people.name(r.ownerPersonId)} · החל מ-{formatDate(r.startDate)}
+              אחראי: {people.name(r.ownerPersonId)} · החל מ-{formatDate(r.startDate)}
               {r.endDate && ` · עד ${formatDate(r.endDate)}`}
               {r.nextOccurrenceDate && ` · המופע הבא: ${formatDate(r.nextOccurrenceDate)}`}
             </p>
@@ -153,7 +153,7 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
         </label>
       </div>
       <label>
-        אחראי/ת
+        אחראי
         <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
       </label>
       <fieldset>
