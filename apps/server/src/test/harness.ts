@@ -1,4 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import { pino } from 'pino';
+import type { SourceTable } from '@org/shared';
+import { SecretBox } from '../lib/secret-box';
+import { DRIVE_FILE_SCOPE, type GoogleFileMeta, type GoogleWorkspace } from '../modules/google/gateway';
 import { eq } from 'drizzle-orm';
 import { buildApp } from '../app';
 import { loadConfig } from '../config';
@@ -19,6 +23,7 @@ export async function createHarness() {
   await database.migrate();
   const clock = { now: T0 };
   const mailer = new ConsoleMailer();
+  const fakeDrive = createFakeDrive();
   const ctx: AppContext = {
     db: database.db,
     config: loadConfig({ NODE_ENV: 'test', AUTH_DEV_LOGIN: 'true', APP_URL: 'http://app.test' }),
@@ -26,6 +31,8 @@ export async function createHarness() {
     google: {
       verify: async (credential) => (credential.startsWith('google:') ? { sub: `sub-${credential}`, email: credential.slice(7) } : null),
     },
+    googleWorkspace: { api: fakeDrive.api, secrets: new SecretBox(randomBytes(32).toString('base64')) },
+    publicSheets: { fetchCsv: async (id) => fakeDrive.publicCsv.get(id) ?? null },
     log: pino({ level: 'silent' }),
     now: () => clock.now,
   };
@@ -49,6 +56,7 @@ export async function createHarness() {
     database,
     clock,
     mailer,
+    fakeDrive,
     orgId,
     manager,
     partner: principal(partner!.id),
@@ -61,3 +69,46 @@ export async function createHarness() {
 }
 
 export type Harness = Awaited<ReturnType<typeof createHarness>>;
+
+/** In-memory stand-in for Google Drive/Sheets. Files are visible only when "picked" (drive.file semantics). */
+export function createFakeDrive() {
+  const files = new Map<string, GoogleFileMeta & { tables?: SourceTable[] }>();
+  const publicCsv = new Map<string, string>();
+  const tokens = new Set<string>();
+  const check = (t: string) => {
+    if (!tokens.has(t)) throw new Error('bad token');
+  };
+  const api: GoogleWorkspace = {
+    async exchangeCode(code) {
+      tokens.add(`refresh-${code}`);
+      return { refreshToken: `refresh-${code}`, scope: `openid ${DRIVE_FILE_SCOPE}` };
+    },
+    async accessToken(t) {
+      check(t);
+      return `access-for-${t}`;
+    },
+    async getFile(t, id) {
+      check(t);
+      const f = files.get(id);
+      return f ? { id: f.id, name: f.name, mimeType: f.mimeType, webViewLink: f.webViewLink } : null;
+    },
+    async readSpreadsheet(t, id) {
+      check(t);
+      return files.get(id)?.tables ?? null;
+    },
+    async upload(t, file) {
+      check(t);
+      const id = `uploaded${files.size.toString().padStart(8, '0')}`;
+      const mimeType = file.name.endsWith('.xlsx') ? 'application/vnd.google-apps.spreadsheet' : 'application/vnd.google-apps.document';
+      const meta = { id, name: file.name.replace(/\.[^.]+$/, ''), mimeType, webViewLink: `https://docs.google.com/x/d/${id}/edit` };
+      files.set(id, meta);
+      return meta;
+    },
+    async revoke(t) {
+      tokens.delete(t);
+    },
+  };
+  const addSheet = (id: string, name: string, tables: SourceTable[]) =>
+    files.set(id, { id, name, mimeType: 'application/vnd.google-apps.spreadsheet', webViewLink: `https://docs.google.com/spreadsheets/d/${id}/edit`, tables });
+  return { api, files, publicCsv, addSheet };
+}

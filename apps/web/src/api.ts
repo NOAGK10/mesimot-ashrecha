@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  CategoryDto,
+  DocumentDto,
+  GoogleStatusDto,
   MeDto,
   PersonDto,
   RecurrenceDto,
@@ -35,6 +38,33 @@ export async function api<T>(method: string, url: string, body?: unknown): Promi
   }
   return data as T;
 }
+
+/** Multipart upload of a single file plus form fields. */
+export async function upload<T>(url: string, file: File, fields: Record<string, string> = {}): Promise<T> {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  form.append('file', file);
+  const res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'x-requested-with': 'fetch' }, body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = (data as { error?: { code?: string; message?: string } }).error;
+    throw new ApiError(res.status, err?.code ?? 'error', err?.message ?? res.statusText);
+  }
+  return data as T;
+}
+
+export const useDocuments = (includeArchived = false, enabled = true) =>
+  useQuery({
+    queryKey: ['documents', includeArchived],
+    queryFn: () => api<DocumentDto[]>('GET', `/api/documents${includeArchived ? '?includeArchived=true' : ''}`),
+    enabled,
+  });
+
+export const useCategories = () =>
+  useQuery({ queryKey: ['categories'], queryFn: () => api<CategoryDto[]>('GET', '/api/document-categories'), staleTime: 60_000 });
+
+export const useGoogleStatus = () =>
+  useQuery({ queryKey: ['google-status'], queryFn: () => api<GoogleStatusDto>('GET', '/api/google/status'), staleTime: 60_000 });
 
 export const useMe = () =>
   useQuery<MeDto | null>({

@@ -9,6 +9,8 @@ import { RecurrencesPage } from './pages/RecurrencesPage';
 import { PeoplePage } from './pages/PeoplePage';
 import { OpsPage } from './pages/OpsPage';
 import { DevOutboxPage } from './pages/DevOutboxPage';
+import { DocumentsPage } from './pages/DocumentsPage';
+import { ImportPage } from './pages/ImportPage';
 
 export function App() {
   const me = useMe();
@@ -47,6 +49,7 @@ export function App() {
           <NavLink to="/my">המשימות שלי</NavLink>
           {isManager && <NavLink to="/all">כל המשימות</NavLink>}
           {isManager && <NavLink to="/recurring">משימות חוזרות</NavLink>}
+          {isManager && <NavLink to="/documents">מסמכים</NavLink>}
           {isManager && <NavLink to="/people">אנשים</NavLink>}
           {isManager && <NavLink to="/ops">מצב המערכת</NavLink>}
         </nav>
@@ -59,6 +62,8 @@ export function App() {
           {isManager && <Route path="/tasks/new" element={<NewTaskPage />} />}
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           {isManager && <Route path="/recurring" element={<RecurrencesPage />} />}
+          {isManager && <Route path="/documents" element={<DocumentsPage />} />}
+          {isManager && <Route path="/import" element={<ImportPage />} />}
           {isManager && <Route path="/people" element={<PeoplePage />} />}
           {isManager && <Route path="/ops" element={<OpsPage />} />}
           <Route path="*" element={<Navigate to="/my" replace />} />

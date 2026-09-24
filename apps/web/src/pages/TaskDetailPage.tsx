@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import type { TaskDetailDto } from '@org/shared';
-import { api, useApiMutation, useMe, useTask } from '../api';
+import { api, useApiMutation, useDocuments, useMe, useTask } from '../api';
+import { AddDocument, KIND_ICON, KIND_LABEL } from '../components/AddDocument';
 import { ErrorText, PeopleChecklist, PersonSelect, StatusBadge, usePeopleMap } from '../components/common';
 import { EVENT_LABEL, STATUS_LABEL, formatDate, formatDateTime, transitionLabel } from '../he';
 
@@ -51,6 +52,7 @@ export function TaskDetailPage() {
         <StatusActions task={t} />
       </div>
 
+      <TaskDocuments task={t} />
       {t.canEdit && !t.archivedAt && <EditTask key={t.version} task={t} />}
       {t.canEdit && <ManagerTools task={t} name={name} />}
 
@@ -76,6 +78,73 @@ function EventDetail({ type, data, name }: { type: string; data: Record<string, 
   if (type === 'task.owner_changed') return <> ({name(d.from as string)} ← {name(d.to as string)})</>;
   if (type === 'task.due_date_changed') return <> ({formatDate(d.from as string | null)} ← {formatDate(d.to as string | null)})</>;
   return null;
+}
+
+function TaskDocuments({ task }: { task: TaskDetailDto }) {
+  const [adding, setAdding] = useState(false);
+  const library = useDocuments(false, task.canEdit && adding);
+  const [existing, setExisting] = useState('');
+  const detach = useApiMutation((documentId: string) => api('DELETE', `/api/tasks/${task.id}/documents/${documentId}`), [['task'], ['documents']]);
+  const attach = useApiMutation((documentId: string) => api('POST', `/api/tasks/${task.id}/documents`, { documentId }), [['task'], ['documents']]);
+  if (!task.canEdit && task.documents.length === 0) return null;
+  const attachable = (library.data ?? []).filter((d) => !task.documents.some((x) => x.id === d.id));
+
+  return (
+    <div className="card">
+      <h2>מסמכים</h2>
+      {task.documents.length === 0 && <p className="muted small">אין מסמכים מקושרים.</p>}
+      <ul className="doc-list">
+        {task.documents.map((d) => (
+          <li key={d.id}>
+            <div className="doc-main">
+              <span aria-hidden>{KIND_ICON[d.kind]}</span>
+              <a href={d.url} target="_blank" rel="noreferrer">
+                {d.title}
+              </a>
+              <span className="tag">{KIND_LABEL[d.kind]}</span>
+            </div>
+            {task.canEdit && !task.archivedAt && (
+              <button className="link" onClick={() => detach.mutate(d.id)}>
+                הסרה מהמשימה
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {task.canEdit && !task.archivedAt && (
+        <>
+          {!adding ? (
+            <button className="secondary" onClick={() => setAdding(true)}>
+              + קישור מסמך
+            </button>
+          ) : (
+            <div className="stack">
+              {attachable.length > 0 && (
+                <div className="row-inline">
+                  <select value={existing} onChange={(e) => setExisting(e.target.value)} aria-label="מסמך קיים">
+                    <option value="">מסמך שכבר קיים במערכת…</option>
+                    {attachable.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {KIND_ICON[d.kind]} {d.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button disabled={!existing} onClick={() => attach.mutate(existing, { onSuccess: () => (setExisting(''), setAdding(false)) })}>
+                    קישור
+                  </button>
+                </div>
+              )}
+              <AddDocument taskId={task.id} onDone={() => setAdding(false)} />
+              <button className="link" onClick={() => setAdding(false)}>
+                סגירה
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      <ErrorText error={detach.error ?? attach.error} />
+    </div>
+  );
 }
 
 function StatusActions({ task }: { task: TaskDetailDto }) {

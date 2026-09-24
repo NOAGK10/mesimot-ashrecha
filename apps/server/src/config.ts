@@ -13,6 +13,14 @@ const envSchema = z.object({
   /** Public base URL of the web app, used in e-mail links. */
   APP_URL: z.url().default('http://localhost:5173'),
   GOOGLE_CLIENT_ID: z.string().optional(),
+  /** Phase 2 Drive/Sheets access. All four are needed to enable the Google document features. */
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
+  /** Google Cloud project number, required by the Picker. */
+  GOOGLE_APP_ID: z.string().optional(),
+  /** 32 random bytes, base64. Encrypts stored Google refresh tokens. */
+  TOKEN_ENCRYPTION_KEY: z.string().optional(),
+  MAX_UPLOAD_MB: z.coerce.number().positive().default(10),
   /** Development-only sign-in by e-mail, without Google. Refused in production. */
   AUTH_DEV_LOGIN: bool.default(false),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),

@@ -2,10 +2,14 @@ import path from 'node:path';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
+import multipart from '@fastify/multipart';
 import type { AppContext } from './context';
 import { attachPrincipal, requirePrincipal } from './http';
 import { AppError, forbidden } from './lib/errors';
+import { documentRoutes } from './modules/documents/routes';
+import { googleRoutes } from './modules/google/routes';
 import { identityRoutes } from './modules/identity/routes';
+import { importRoutes } from './modules/imports/routes';
 import { policy } from './modules/identity/policy';
 import { ConsoleMailer } from './modules/notifications/mailer';
 import { recurrenceRoutes } from './modules/recurrence/routes';
@@ -20,6 +24,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions): Promise<Fasti
   const app = Fastify({ loggerInstance: ctx.log as FastifyBaseLogger, trustProxy: true });
   app.decorateRequest('principal', null);
   await app.register(cookie);
+  await app.register(multipart, { limits: { fileSize: ctx.config.MAX_UPLOAD_MB * 1024 * 1024, files: 1, fields: 10 } });
 
   // CSRF defence in depth (cookies are also SameSite=Lax): state-changing API calls must come from our client.
   app.addHook('onRequest', async (req) => {
@@ -55,6 +60,9 @@ export async function buildApp(ctx: AppContext, opts: AppOptions): Promise<Fasti
   identityRoutes(app, ctx);
   taskRoutes(app, ctx);
   recurrenceRoutes(app, ctx);
+  documentRoutes(app, ctx);
+  importRoutes(app, ctx);
+  googleRoutes(app, ctx);
 
   app.get('/api/ops/status', async (req) => {
     if (!policy.canViewOperations(requirePrincipal(req))) throw forbidden();

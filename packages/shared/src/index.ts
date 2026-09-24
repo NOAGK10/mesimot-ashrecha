@@ -91,6 +91,115 @@ export const updateRecurrenceSchema = z.object({
   endDate: isoDate.nullable().optional(),
 });
 
+// ---- Documents (Phase 2) ----
+export const DOCUMENT_KINDS = ['google_doc', 'google_sheet', 'link'] as const;
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+
+export const addDocumentSchema = z.union([
+  z.object({ googleFileId: z.string().min(10).max(200), categoryId: uuid.nullable().default(null), taskId: uuid.optional() }),
+  z.object({
+    url: z.url().max(2000),
+    title: z.string().trim().min(1).max(300).optional(),
+    categoryId: uuid.nullable().default(null),
+    taskId: uuid.optional(),
+  }),
+]);
+export const updateDocumentSchema = z.object({
+  title: z.string().trim().min(1).max(300).optional(),
+  categoryId: uuid.nullable().optional(),
+  archived: z.boolean().optional(),
+});
+export const categorySchema = z.object({ name: z.string().trim().min(1).max(100) });
+export const linkDocumentSchema = z.object({ documentId: uuid });
+
+export interface DocumentDto {
+  id: string;
+  kind: DocumentKind;
+  title: string;
+  url: string;
+  googleFileId: string | null;
+  categoryId: string | null;
+  taskIds: string[];
+  createdAt: string;
+  archivedAt: string | null;
+}
+export interface CategoryDto {
+  id: string;
+  name: string;
+}
+
+// ---- Sheet import (Phase 2) ----
+/** A table read from an uploaded file or a Google Sheet, before any mapping. */
+export interface SourceTable {
+  name: string;
+  rows: string[][];
+}
+export interface ImportPreviewDto {
+  sourceName: string;
+  googleFileId: string | null;
+  tables: SourceTable[];
+  truncated: boolean;
+}
+export const importPreviewGoogleSchema = z.object({ googleFileId: z.string().min(10).max(200) });
+export const importPreviewLinkSchema = z.object({ url: z.url().max(2000) });
+
+/** One reviewed row, already mapped by the manager. The server validates everything again. */
+export const importRowSchema = z.object({
+  sourceRow: z.number().int().min(1),
+  title: z.string().trim().min(1).max(300),
+  description: z.string().max(20_000).default(''),
+  ownerPersonId: uuid,
+  dueDate: isoDate.nullable().default(null),
+  status: z.enum(TASK_STATUSES).default('new'),
+  participantIds: z.array(uuid).max(100).default([]),
+});
+export const commitImportSchema = z.object({
+  sourceName: z.string().trim().min(1).max(300),
+  sheetName: z.string().max(300).default(''),
+  googleFileId: z.string().min(10).max(200).nullable().default(null),
+  categoryId: uuid.nullable().default(null),
+  rows: z.array(importRowSchema).min(1).max(2000),
+});
+export interface ImportResultDto {
+  importId: string;
+  created: number;
+  documentId: string | null;
+}
+
+/** Lenient date reader for spreadsheet cells: 25/09/2026, 25.9.26, 2026-09-25. Day comes first. */
+export function parseLooseDate(input: string): string | null {
+  const s = input.trim();
+  if (!s) return null;
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+  let y: number, mo: number, d: number;
+  if (m) {
+    [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  } else {
+    m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})$/.exec(s);
+    if (!m) return null;
+    [d, mo, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    if (y < 100) y += 2000;
+  }
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+/** Cell values that usually mean "done" in hand-kept sheets. */
+export function looksDone(input: string): boolean {
+  return /^(v|✓|✔|☑|x|true|yes|done|כן|בוצע|הושלם|הושלמה|סיום|נעשה|גמור)$/i.test(input.trim());
+}
+
+// ---- Google connection ----
+export interface GoogleStatusDto {
+  enabled: boolean;
+  connected: boolean;
+  clientId: string | null;
+  apiKey: string | null;
+  appId: string | null;
+}
+export const googleConnectSchema = z.object({ code: z.string().min(10) });
+
 // ---- Auth ----
 export const googleLoginSchema = z.object({ credential: z.string().min(10) });
 export const devLoginSchema = z.object({ email: z.email() });
@@ -135,6 +244,7 @@ export interface TaskDetailDto extends TaskDto {
   events: AuditEventDto[];
   /** Display names of everyone referenced by this task and its history. */
   names: Record<string, string>;
+  documents: DocumentDto[];
 }
 export interface RecurrenceDto {
   id: string;

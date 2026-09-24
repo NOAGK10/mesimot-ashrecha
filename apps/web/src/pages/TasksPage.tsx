@@ -27,9 +27,14 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
       <div className="page-head">
         <h1>{scope === 'mine' ? 'המשימות שלי' : 'כל משימות הארגון'}</h1>
         {isManager && (
-          <Link className="button" to="/tasks/new">
-            + משימה חדשה
-          </Link>
+          <div className="actions tight">
+            <Link className="button secondary-link" to="/import">
+              ייבוא מגיליון
+            </Link>
+            <Link className="button" to="/tasks/new">
+              + משימה חדשה
+            </Link>
+          </div>
         )}
       </div>
 

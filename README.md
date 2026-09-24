@@ -17,6 +17,9 @@ apps/server         Modular monolith (Fastify + Drizzle + PostgreSQL)
     recurrence/     Recurrence definitions and occurrence generation
     notifications/  Reminder planning, outbox, e-mail delivery
     audit/          Append-only audit log
+    documents/      Document references, categories, task links (Phase 2)
+    imports/        Sheet import: parse → preview → approved commit (Phase 2)
+    google/         Integration boundary to Google Drive/Sheets (Phase 2)
   src/worker.ts     Background worker (recurrence + notification delivery + heartbeat)
   drizzle/          SQL migrations
 apps/web            React + Vite, Hebrew RTL
@@ -47,6 +50,15 @@ npm run dev:web
 Open http://localhost:5173 and sign in with the dev login as `manager@example.org`. E-mails are not sent in dev; open http://localhost:5173/dev/outbox to read them and follow magic links.
 
 To use Google sign-in, create an OAuth 2.0 Web client in Google Cloud, add `http://localhost:5173` as an authorised JavaScript origin, and set `GOOGLE_CLIENT_ID`.
+
+### Google Drive / Sheets (Phase 2)
+
+Excel/CSV import and pasted links work without any Google setup. For picking from Drive and uploading to Drive:
+
+1. In the same Google Cloud project, enable **Google Drive API**, **Google Sheets API** and **Google Picker API**.
+2. OAuth consent screen: add the scope `https://www.googleapis.com/auth/drive.file` (non-sensitive — no verification needed). While the app is in *Testing*, add the managers as test users; publish it before go-live, otherwise Google expires refresh tokens after 7 days.
+3. Create an **API key** restricted to the Picker API and your site's origin.
+4. Set `GOOGLE_CLIENT_SECRET`, `GOOGLE_API_KEY`, `GOOGLE_APP_ID` (project number) and `TOKEN_ENCRYPTION_KEY` (see `apps/server/.env.example`).
 
 ## Tests
 

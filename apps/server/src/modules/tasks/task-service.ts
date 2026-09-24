@@ -16,6 +16,7 @@ import { people, taskParticipants, tasks } from '../../db/schema';
 import { endOfWeek, todayIn } from '../../lib/dates';
 import { forbidden, invalid, notFound, staleVersion } from '../../lib/errors';
 import { listAudit, recordAudit } from '../audit/audit';
+import { documentsOfTask } from '../documents/document-service';
 import { getOrg } from '../identity/org';
 import { policy } from '../identity/policy';
 import { actorOf, type Principal } from '../identity/principal';
@@ -239,5 +240,6 @@ export async function getTaskDetail(ctx: AppContext, p: Principal, id: string): 
     canEdit: policy.canEditTask(p, task),
     events,
     names: Object.fromEntries(named.map((n) => [n.id, n.displayName])),
+    documents: await documentsOfTask(ctx.db, id),
   };
 }

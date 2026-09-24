@@ -47,3 +47,20 @@ Every PROPOSED item is isolated in one place in the code, so changing it is loca
 ## Still open before production
 
 - A2 Google account type · A7 cloud provider · backup/restore RPO & RTO targets · real SMTP provider · error-tracking service (logs are structured JSON via pino; a Sentry-style hook is not wired yet).
+
+# Phase 2 — Documents and sheet import
+
+Started at the product owner's request before Phase 1 was in real use (the baseline says Phase 2 comes after Phase 1 usage). **Deviation to be acknowledged by the architect.**
+
+| ID | Topic | Status | What was implemented |
+|---|---|---|---|
+| P2-1 | Purpose | **APPROVED** — "turn our sheets into the site" | One-time **import** of a hand-kept table into tasks. After the import the app is the source of truth; the sheet is never written back to. |
+| P2-2 | Sources | **APPROVED** — all | Excel (.xlsx) / CSV upload, Google Sheet picked from Drive, pasted Sheets link (works only if the sheet is private-but-picked, or shared "anyone with the link"). |
+| P2-3 | Google account type | **APPROVED** — consumer Gmail | Scope `drive.file` only: non-sensitive, no Google verification needed. The app sees only files the user picks or the app creates. |
+| P2-4 | Approval boundary | PROPOSED | Import is two steps: preview (nothing stored) → manager reviews every mapped row → commit creates all rows in **one transaction** or none. Each task records its source import and row (`task_import_rows`), not a new column on Task (rule 10). |
+| P2-5 | Import notifications | PROPOSED | No "assigned" e-mails for imported tasks (they already existed on paper); date reminders apply to open ones. |
+| P2-6 | Unmapped data | PROPOSED | Unmapped columns and unreadable dates are appended to the task description so nothing from the sheet is lost. |
+| P2-7 | Documents | PROPOSED | References only (id, kind, title, URL, category). Managers add/categorise/attach; anyone who can see a task sees its documents. Dedup by Google file id. Upload stores the file in the uploader's Drive (converted to Docs/Sheets). |
+| P2-8 | Google credentials | PROPOSED | Authorization-code popup; refresh token exchanged and stored **server-side, AES-256-GCM encrypted**. The browser only receives a short-lived access token for the Picker (baseline §20 "no privileged Google access from frontend" — the Picker token is user-scoped and short-lived). |
+
+Still open for Phase 2: R-04 (document moved/deleted/access revoked — currently the link simply stops working), whether guests should see a document library, and whether sheets should ever be written back to (would be a baseline change).

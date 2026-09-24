@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import type { TaskDto } from '@org/shared';
+import type { TaskDto, TaskStatus } from '@org/shared';
 import type { Db } from '../../db/client';
 import { people, taskParticipants, tasks } from '../../db/schema';
 import { invalid } from '../../lib/errors';
@@ -55,6 +55,8 @@ export interface NewTask {
   participantIds: readonly string[];
   createdByPersonId: string | null;
   recurrence?: { definitionId: string; occurrenceDate: IsoDate };
+  /** Initial status; only imports start anywhere other than 'new'. */
+  status?: TaskStatus;
 }
 
 /**
@@ -74,6 +76,8 @@ export async function insertTask(tx: Db, t: NewTask, now: Date): Promise<TaskWit
       createdByPersonId: t.createdByPersonId,
       recurrenceDefinitionId: t.recurrence?.definitionId ?? null,
       occurrenceDate: t.recurrence?.occurrenceDate ?? null,
+      status: t.status ?? 'new',
+      completedAt: t.status === 'completed' ? now : null,
       createdAt: now,
       updatedAt: now,
     })

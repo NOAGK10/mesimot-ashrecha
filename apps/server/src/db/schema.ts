@@ -16,6 +16,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import {
+  DOCUMENT_KINDS,
   PERSON_ROLES,
   RECURRENCE_FREQS,
   RECURRENCE_MODES,
@@ -236,6 +237,76 @@ export const notifications = pgTable(
     index('notifications_due_idx').on(t.status, t.sendAt),
   ],
 );
+
+// ---------------- Documents (Phase 2) ----------------
+
+export const documentKind = pgEnum('document_kind', DOCUMENT_KINDS);
+
+export const documentCategories = pgTable(
+  'document_categories',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    name: text('name').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('document_categories_org_name_uq').on(t.orgId, t.name)],
+);
+
+/** A reference to an external document. Google owns the content; we keep identity and metadata only. */
+export const documents = pgTable(
+  'documents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    kind: documentKind('kind').notNull(),
+    googleFileId: text('google_file_id'),
+    url: text('url').notNull(),
+    title: text('title').notNull(),
+    categoryId: uuid('category_id').references(() => documentCategories.id, { onDelete: 'set null' }),
+    addedByPersonId: uuid('added_by_person_id').notNull().references(() => people.id),
+    createdAt: createdAt(),
+    archivedAt: ts('archived_at'),
+  },
+  (t) => [uniqueIndex('documents_org_google_uq').on(t.orgId, t.googleFileId)],
+);
+
+export const taskDocuments = pgTable(
+  'task_documents',
+  {
+    taskId: uuid('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+    documentId: uuid('document_id').notNull().references(() => documents.id, { onDelete: 'cascade' }),
+    addedByPersonId: uuid('added_by_person_id').references(() => people.id),
+    addedAt: ts('added_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.taskId, t.documentId] }), index('task_documents_document_idx').on(t.documentId)],
+);
+
+/** One approved sheet import. Rows are traced in task_import_rows rather than on the Task entity. */
+export const taskImports = pgTable('task_imports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id),
+  sourceName: text('source_name').notNull(),
+  sheetName: text('sheet_name').notNull().default(''),
+  documentId: uuid('document_id').references(() => documents.id, { onDelete: 'set null' }),
+  approvedByPersonId: uuid('approved_by_person_id').notNull().references(() => people.id),
+  rowCount: integer('row_count').notNull(),
+  createdAt: createdAt(),
+});
+
+export const taskImportRows = pgTable('task_import_rows', {
+  taskId: uuid('task_id').primaryKey().references(() => tasks.id, { onDelete: 'cascade' }),
+  importId: uuid('import_id').notNull().references(() => taskImports.id, { onDelete: 'cascade' }),
+  sourceRow: integer('source_row').notNull(),
+});
+
+/** Per-person Google authorization (drive.file scope). The refresh token is encrypted at rest. */
+export const googleConnections = pgTable('google_connections', {
+  personId: uuid('person_id').primaryKey().references(() => people.id, { onDelete: 'cascade' }),
+  refreshTokenEnc: text('refresh_token_enc').notNull(),
+  scope: text('scope').notNull(),
+  connectedAt: ts('connected_at').notNull().defaultNow(),
+});
 
 // ---------------- Operations ----------------
 
