@@ -1,0 +1,42 @@
+{
+  "name": "@org/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "start": "node dist/main.js",
+    "start:worker": "node dist/worker-main.js",
+    "migrate:prod": "node dist/migrate-main.js",
+    "build": "tsup",
+    "migrate": "tsx --env-file-if-exists=.env src/migrate-main.ts",
+    "db:generate": "drizzle-kit generate",
+    "seed": "tsx --env-file-if-exists=.env src/seed-main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/static": "^10.1.4",
+    "drizzle-orm": "^0.45.3",
+    "fastify": "^5.12.5",
+    "google-auth-library": "^11.1.0",
+    "luxon": "^3.7.2",
+    "nodemailer": "^10.0.10",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.5",
+    "@types/node": "^26.6.2",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
