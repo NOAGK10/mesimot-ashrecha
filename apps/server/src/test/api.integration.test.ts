@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
-import { notifications } from '../db/schema';
+import { notifications, workerHeartbeats } from '../db/schema';
 import { dispatchDueNotifications } from '../modules/notifications/dispatcher';
 import { runWorkerTick } from '../worker';
-import { createHarness, type Harness } from './harness';
+import { CRON_SECRET_FOR_TESTS, createHarness, type Harness } from './harness';
 
 let h: Harness;
 let app: FastifyInstance;
@@ -155,6 +155,17 @@ describe('HTTP API', () => {
     expect((await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } })).json().organization.name).toBe('אשריך');
     const guest = await login('guest@example.org');
     expect((await app.inject({ method: 'PATCH', url: '/api/organization', headers: { ...JSON_HEADERS, cookie: guest }, payload: { name: 'x' } })).statusCode).toBe(403);
+  });
+
+  it('cron tick runs the background duties only with the right secret', async () => {
+    const url = '/api/cron/tick';
+    const headers = { 'x-requested-with': 'fetch' };
+    expect((await app.inject({ method: 'POST', url, headers: { ...headers, 'x-cron-secret': 'wrong' } })).statusCode).toBe(401);
+    h.clock.now = new Date('2026-10-04T07:00:00Z');
+    expect((await app.inject({ method: 'POST', url, headers: { ...headers, 'x-cron-secret': CRON_SECRET_FOR_TESTS } })).json()).toEqual({ ok: true });
+    const [beat] = await h.ctx.db.select().from(workerHeartbeats);
+    expect(beat!.lastBeatAt.toISOString()).toBe('2026-10-04T07:00:00.000Z');
+    h.clock.now = new Date('2026-10-04T06:00:00Z');
   });
 
   it('health endpoints', async () => {

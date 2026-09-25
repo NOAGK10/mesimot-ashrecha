@@ -1,0 +1,25 @@
+# Wakes the free Render service and runs reminders + recurring tasks. Needs:
+#   repository variable APP_URL (e.g. https://ashrecha.onrender.com)
+#   repository secret   CRON_SECRET (copy from the Render service's environment)
+name: Background tick
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Wake the site and run background duties
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL / CRON_SECRET are not configured yet — skipping."; exit 0
+          fi
+          # A sleeping free service needs up to a minute to start, hence the retries.
+          curl -fsS --retry 6 --retry-delay 20 --retry-all-errors --max-time 90 \
+            -X POST -H "x-cron-secret: $CRON_SECRET" -H "x-requested-with: fetch" \
+            "$APP_URL/api/cron/tick"

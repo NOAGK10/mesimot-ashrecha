@@ -71,7 +71,7 @@ export async function workerStatus(ctx: AppContext) {
     worker: {
       lastBeatAt: beat?.lastBeatAt.toISOString() ?? null,
       lastBeatAgeSeconds,
-      healthy: lastBeatAgeSeconds !== null && lastBeatAgeSeconds < ctx.config.WORKER_INTERVAL_SECONDS * 4,
+      healthy: lastBeatAgeSeconds !== null && lastBeatAgeSeconds < healthyWithinSeconds(ctx),
       lastError: beat?.lastError ?? null,
       lastErrorAt: beat?.lastErrorAt?.toISOString() ?? null,
     },
@@ -79,4 +79,9 @@ export async function workerStatus(ctx: AppContext) {
     backlogOlderThan15Min: overduePending?.n ?? 0,
     recentFailures,
   };
+}
+
+/** With an external scheduler the process may sleep between calls, so allow two missed calls. */
+function healthyWithinSeconds(ctx: AppContext): number {
+  return Math.max(ctx.config.WORKER_INTERVAL_SECONDS * 4, ctx.config.CRON_INTERVAL_MINUTES * 60 * 2 + 300);
 }

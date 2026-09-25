@@ -1,0 +1,55 @@
+# Render Blueprint — free web service. Database: Neon (free, permanent). See docs/DEPLOY.md.
+services:
+  - type: web
+    name: ashrecha
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node apps/server/dist/main.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0
+      - key: WEB_DIST_DIR
+        value: apps/web/dist
+      # Free services sleep; the in-process loop runs while awake and GitHub Actions wakes it every 30 min.
+      - key: WORKER_MODE
+        value: inline
+      - key: CRON_INTERVAL_MINUTES
+        value: "30"
+      - key: MIGRATE_ON_START
+        value: "true"
+      - key: MAIL_TRANSPORT
+        value: smtp
+      - key: BOOTSTRAP_ORG_NAME
+        value: אשריך
+      - key: CRON_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      # Filled in by hand in the Render dashboard (never committed):
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: BOOTSTRAP_MANAGER_EMAILS
+        sync: false
+      # Optional — only for choosing files from Google Drive:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GOOGLE_APP_ID
+        sync: false

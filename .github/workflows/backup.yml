@@ -1,0 +1,27 @@
+# Daily database backup kept as a private workflow artifact for 30 days. Needs:
+#   repository secret DATABASE_URL (the Neon connection string)
+# Restore: see docs/DEPLOY.md, "שחזור מגיבוי".
+name: Database backup
+on:
+  schedule:
+    - cron: "15 1 * * *"
+  workflow_dispatch:
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL is not configured yet — skipping."; exit 0; fi
+          docker run --rm -e DATABASE_URL postgres:17 sh -c 'pg_dump "$DATABASE_URL" --no-owner --no-privileges --format=custom' > backup.dump
+          test -s backup.dump
+          echo "BACKUP_NAME=backup-$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('backup.dump') != ''
+        with:
+          name: ${{ env.BACKUP_NAME }}
+          path: backup.dump
+          retention-days: 30

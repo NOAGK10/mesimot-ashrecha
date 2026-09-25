@@ -14,6 +14,8 @@ import { ConsoleMailer } from '../modules/notifications/mailer';
 import { createPerson } from '../modules/identity/people-service';
 import { bootstrapOrganization } from '../seed';
 
+export const CRON_SECRET_FOR_TESTS = 'test-cron-secret-0123456789abcdef';
+
 /** Sunday 4 Oct 2026, 09:00 in Asia/Jerusalem (UTC+3). */
 export const T0 = new Date('2026-10-04T06:00:00Z');
 
@@ -26,7 +28,7 @@ export async function createHarness() {
   const fakeDrive = createFakeDrive();
   const ctx: AppContext = {
     db: database.db,
-    config: loadConfig({ NODE_ENV: 'test', AUTH_DEV_LOGIN: 'true', APP_URL: 'http://app.test' }),
+    config: loadConfig({ NODE_ENV: 'test', AUTH_DEV_LOGIN: 'true', APP_URL: 'http://app.test', CRON_SECRET: CRON_SECRET_FOR_TESTS }),
     mailer,
     google: {
       verify: async (credential) => (credential.startsWith('google:') ? { sub: `sub-${credential}`, email: credential.slice(7) } : null),
