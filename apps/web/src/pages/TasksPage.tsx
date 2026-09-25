@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import type { TaskStatus, TaskView } from '@org/shared';
 import { TASK_STATUSES, TASK_VIEWS } from '@org/shared';
@@ -15,6 +15,13 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
   const [owner, setOwner] = useState('');
   const [status, setStatus] = useState<TaskStatus | ''>('');
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  // Wait for a short pause in typing before asking the server.
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(search.trim()), 250);
+    return () => clearTimeout(id);
+  }, [search]);
   const people = usePeopleMap();
   const tasks = useTasks({
     view,
@@ -22,6 +29,7 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
     personId: scope === 'person' ? personId : undefined,
     ownerPersonId: owner || undefined,
     status: status || undefined,
+    q: query || undefined,
     includeArchived,
   });
 
@@ -46,6 +54,15 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
           </div>
         )}
       </div>
+
+      <input
+        type="search"
+        className="search"
+        placeholder="🔍 חיפוש משימה…"
+        aria-label="חיפוש משימה"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
 
       <div className="tabs" role="tablist">
         {TASK_VIEWS.map((v) => (
@@ -89,7 +106,7 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
       </div>
 
       {tasks.isLoading && <p className="muted">טוען…</p>}
-      {tasks.data?.length === 0 && <p className="empty">אין משימות בתצוגה הזו.</p>}
+      {tasks.data?.length === 0 && <p className="empty">{query ? `לא נמצאו משימות עם "${query}" בתצוגה הזו.` : 'אין משימות בתצוגה הזו.'}</p>}
       {tasks.data && tasks.data.length > 0 && (
         <table className="task-table">
           <thead>

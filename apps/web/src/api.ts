@@ -91,6 +91,7 @@ export interface TaskFilters {
   mine: boolean;
   ownerPersonId?: string;
   personId?: string;
+  q?: string;
   status?: TaskStatus;
   includeArchived?: boolean;
 }
@@ -103,6 +104,7 @@ export const useTasks = (f: TaskFilters) =>
       if (f.mine) q.set('mine', 'true');
       if (f.ownerPersonId) q.set('ownerPersonId', f.ownerPersonId);
       if (f.personId) q.set('personId', f.personId);
+      if (f.q) q.set('q', f.q);
       if (f.status) q.set('status', f.status);
       if (f.includeArchived) q.set('includeArchived', 'true');
       return api<TaskDto[]>('GET', `/api/tasks?${q}`);

@@ -68,6 +68,8 @@ export const listTasksQuerySchema = z.object({
   ownerPersonId: uuid.optional(),
   /** Tasks a person is involved in (owner or participant) — the personal page. */
   personId: uuid.optional(),
+  /** Free-text search in title and description. */
+  q: z.string().trim().max(100).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   includeArchived: z.coerce.boolean().default(false),
 });

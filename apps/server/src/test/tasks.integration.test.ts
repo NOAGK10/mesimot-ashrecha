@@ -152,6 +152,16 @@ describe('task management', () => {
     expect(await listTasks(h.ctx, h.guest, { view: 'all', mine: false, personId: h.contactId, includeArchived: false })).toEqual([]);
   });
 
+  it('searches title and description, treating % and _ literally', async () => {
+    await createTask(h.ctx, h.manager, { ...base, title: 'S-להזמין כיסאות', ownerPersonId: h.manager.personId, dueDate: null });
+    await createTask(h.ctx, h.manager, { ...base, title: 'S-אולם', description: 'לשלם 50% מקדמה', ownerPersonId: h.manager.personId, dueDate: null });
+    const find = async (q: string) =>
+      (await listTasks(h.ctx, h.manager, { view: 'all', mine: false, includeArchived: false, q })).map((t) => t.title).filter((t) => t.startsWith('S-'));
+    expect(await find('כיסא')).toEqual(['S-להזמין כיסאות']);
+    expect(await find('50%')).toEqual(['S-אולם']);
+    expect(await find('5_%')).toEqual([]);
+  });
+
   it('computes Today / This Week / Overdue / Future in the organisation timezone', async () => {
     // T0 = Sunday 2026-10-04 09:00 Jerusalem. Week ends Saturday 2026-10-10.
     const who = h.principal(h.partner.personId);

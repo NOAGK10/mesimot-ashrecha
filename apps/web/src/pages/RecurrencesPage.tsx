@@ -5,13 +5,20 @@ import { ErrorText, PeopleChecklist, PersonSelect, usePeopleMap } from '../compo
 import { WEEKDAYS, formatDate } from '../he';
 
 const KEYS = [['recurrences'], ['tasks']];
-const STATE_LABEL = { active: 'פעילה', paused: 'מושהית', ended: 'הסתיימה' } as const;
+const STATE_LABEL = { active: 'פעילה', paused: 'מושהית', ended: 'הופסקה' } as const;
 const FREQ_UNIT = { daily: 'ימים', weekly: 'שבועות', monthly: 'חודשים' } as const;
+const ONE_UNIT = { daily: 'יום', weekly: 'שבוע', monthly: 'חודש' } as const;
 
 function describe(r: RecurrenceDto): string {
   const every = r.interval === 1 ? { daily: 'כל יום', weekly: 'כל שבוע', monthly: 'כל חודש' }[r.freq] : `כל ${r.interval} ${FREQ_UNIT[r.freq]}`;
-  if (r.mode === 'after_completion') return `${every} מרגע ההשלמה`;
-  if (r.freq === 'weekly' && r.byWeekday.length) return `${every}, בימים ${r.byWeekday.map((d) => WEEKDAYS[d]).join(' ')}`;
+  if (r.mode === 'after_completion') {
+    const gap = r.interval === 1 ? ONE_UNIT[r.freq] : `${r.interval} ${FREQ_UNIT[r.freq]}`;
+    return `${gap} אחרי שהפעם הקודמת הושלמה`;
+  }
+  if (r.freq === 'weekly' && r.byWeekday.length) {
+    const days = r.byWeekday.map((d) => WEEKDAYS[d]);
+    return `${every} ${days.length === 1 ? 'ביום' : 'בימים'} ${days.join(', ')}`;
+  }
   if (r.freq === 'monthly') return `${every}, ב-${r.byMonthDay ?? Number(r.startDate.slice(8))} לחודש`;
   return every;
 }
@@ -20,6 +27,7 @@ export function RecurrencesPage() {
   const list = useRecurrences();
   const people = usePeopleMap();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const act = useApiMutation(({ r, action }: { r: RecurrenceDto; action: 'pause' | 'resume' | 'end' }) =>
     api('POST', `/api/recurrences/${r.id}/${action}`, { version: r.version }), KEYS);
 
@@ -27,10 +35,10 @@ export function RecurrencesPage() {
     <section>
       <div className="page-head">
         <h1>משימות חוזרות</h1>
-        {!creating && <button onClick={() => setCreating(true)}>+ הגדרה חדשה</button>}
+        {!creating && <button onClick={() => setCreating(true)}>+ משימה חוזרת חדשה</button>}
       </div>
       <p className="muted small">
-        הגדרה חוזרת אינה משימה. היא יוצרת מופעים, וכל מופע הוא משימה רגילה ברשימות. שינוי בהגדרה חל רק על מופעים עתידיים.
+        משימה חוזרת יוצרת לבד משימה חדשה כל פעם (למשל כל יום ראשון), והיא מופיעה ברשימות כמו כל משימה. שינוי כאן משפיע רק על הפעמים הבאות.
       </p>
       {creating && <CreateRecurrence onDone={() => setCreating(false)} />}
       {list.data?.length === 0 && <p className="empty">אין משימות חוזרות.</p>}
@@ -45,14 +53,20 @@ export function RecurrencesPage() {
             <p className="muted small">
               אחראי: {people.name(r.ownerPersonId)} · החל מ-{formatDate(r.startDate)}
               {r.endDate && ` · עד ${formatDate(r.endDate)}`}
-              {r.nextOccurrenceDate && ` · המופע הבא: ${formatDate(r.nextOccurrenceDate)}`}
+              {r.nextOccurrenceDate && ` · הפעם הבאה: ${formatDate(r.nextOccurrenceDate)}`}
             </p>
+            {editing === r.id && <EditRecurrence r={r} onDone={() => setEditing(null)} />}
             <div className="actions">
+              {r.state !== 'ended' && editing !== r.id && (
+                <button className="secondary" onClick={() => setEditing(r.id)}>
+                  עריכה
+                </button>
+              )}
               {r.state === 'active' && <button className="secondary" onClick={() => act.mutate({ r, action: 'pause' })}>השהיה</button>}
               {r.state === 'paused' && <button className="secondary" onClick={() => act.mutate({ r, action: 'resume' })}>חידוש</button>}
               {r.state !== 'ended' && (
-                <button className="secondary danger" onClick={() => confirm('לסיים את הסדרה? מופעים קיימים יישארו.') && act.mutate({ r, action: 'end' })}>
-                  סיום
+                <button className="secondary danger" onClick={() => confirm('להפסיק את המשימה החוזרת? משימות שכבר נוצרו יישארו.') && act.mutate({ r, action: 'end' })}>
+                  הפסקה
                 </button>
               )}
             </div>
@@ -95,7 +109,7 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
 
   return (
     <form className="card stack" onSubmit={(e) => (e.preventDefault(), create.mutate(undefined, { onSuccess: onDone }))}>
-      <h2>הגדרה חוזרת חדשה</h2>
+      <h2>משימה חוזרת חדשה</h2>
       <label>
         כותרת
         <input required value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -104,11 +118,11 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
         <legend>סוג החזרתיות</legend>
         <label className="check">
           <input type="radio" checked={mode === 'schedule'} onChange={() => setMode('schedule')} />
-          לוח זמנים קבוע (למשל כל יום ראשון): מופע נוצר בזמנו גם אם הקודם לא הושלם
+          לפי לוח זמנים קבוע (למשל כל יום ראשון): המשימה נוצרת בזמנה, גם אם הקודמת עוד לא הושלמה
         </label>
         <label className="check">
           <input type="radio" checked={mode === 'after_completion'} onChange={() => setMode('after_completion')} />
-          לפי השלמה: המופע הבא נקבע מיום השלמת הקודם
+          אחרי השלמה: הפעם הבאה נקבעת לפי היום שבו הקודמת הושלמה
         </label>
       </fieldset>
       <div className="row">
@@ -144,7 +158,7 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
       )}
       <div className="row">
         <label>
-          {mode === 'schedule' ? 'תאריך התחלה' : 'יעד המופע הראשון'}
+          {mode === 'schedule' ? 'תאריך התחלה' : 'יעד לפעם הראשונה'}
           <input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </label>
         <label>
@@ -164,6 +178,64 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
       <div className="actions">
         <button type="submit" disabled={create.isPending}>יצירה</button>
         <button type="button" className="secondary" onClick={onDone}>ביטול</button>
+      </div>
+    </form>
+  );
+}
+
+/** Edits what does not change the schedule itself; changes apply to the next times only. */
+function EditRecurrence({ r, onDone }: { r: RecurrenceDto; onDone: () => void }) {
+  const people = usePeopleMap();
+  const [title, setTitle] = useState(r.title);
+  const [description, setDescription] = useState(r.description);
+  const [owner, setOwner] = useState(r.ownerPersonId);
+  const [participants, setParticipants] = useState(r.participantIds);
+  const [endDate, setEndDate] = useState(r.endDate ?? '');
+  const save = useApiMutation(async () => {
+    await api('PATCH', `/api/recurrences/${r.id}`, {
+      version: r.version,
+      title,
+      description,
+      ownerPersonId: owner,
+      participantIds: participants.filter((p) => p !== owner),
+      endDate: endDate || null,
+    });
+    onDone();
+  }, KEYS);
+
+  return (
+    <form className="stack edit-inline" onSubmit={(e) => (e.preventDefault(), save.mutate(undefined))}>
+      <label>
+        שם
+        <input required value={title} onChange={(e) => setTitle(e.target.value)} />
+      </label>
+      <label>
+        פרטים
+        <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+      </label>
+      <div className="row">
+        <label>
+          אחראי
+          <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
+        </label>
+        <label>
+          עד תאריך (לא חובה)
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </label>
+      </div>
+      <fieldset>
+        <legend>משתתפים</legend>
+        <PeopleChecklist people={people.list} selected={participants} exclude={owner} onChange={setParticipants} />
+      </fieldset>
+      <p className="muted small">השינוי יחול על הפעמים הבאות. משימות שכבר נוצרו לא ישתנו.</p>
+      <ErrorText error={save.error} />
+      <div className="actions">
+        <button type="submit" disabled={save.isPending}>
+          שמירה
+        </button>
+        <button type="button" className="secondary" onClick={onDone}>
+          ביטול
+        </button>
       </div>
     </form>
   );

@@ -1,4 +1,4 @@
-import { and, asc, eq, exists, gt, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, exists, gt, ilike, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { z } from 'zod';
 import type {
   TaskDetailDto,
@@ -192,6 +192,11 @@ export async function listTasks(ctx: AppContext, p: Principal, q: z.output<typeo
   if (!q.includeArchived) where.push(isNull(tasks.archivedAt));
   if (q.mine || !policy.canListOrgTasks(p)) where.push(involves(p.personId));
   if (q.personId) where.push(involves(q.personId));
+  if (q.q) {
+    // Escape LIKE wildcards so "50%" searches for the text, not a pattern.
+    const pattern = `%${q.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    where.push(or(ilike(tasks.title, pattern), ilike(tasks.description, pattern))!);
+  }
   if (q.ownerPersonId) where.push(eq(tasks.ownerPersonId, q.ownerPersonId));
   if (q.status) where.push(eq(tasks.status, q.status));
   else if (q.view !== 'all') where.push(inArray(tasks.status, [...OPEN_STATUSES]));

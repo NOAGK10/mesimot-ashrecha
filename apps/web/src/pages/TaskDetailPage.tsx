@@ -146,13 +146,14 @@ function TaskDocuments({ task }: { task: TaskDetailDto }) {
       {task.documents.length === 0 && <p className="muted small">אין מסמכים מקושרים.</p>}
       <ul className="doc-list">
         {task.documents.map((d) => (
-          <li key={d.id}>
+          <li key={d.id} className={d.archivedAt ? 'archived' : ''}>
             <div className="doc-main">
               <span aria-hidden>{KIND_ICON[d.kind]}</span>
               <a href={d.url} target="_blank" rel="noreferrer">
                 {d.title}
               </a>
               <span className="tag">{KIND_LABEL[d.kind]}</span>
+              {d.archivedAt && <span className="tag">בארכיון</span>}
             </div>
             {task.canEdit && !task.archivedAt && (
               <button className="link" onClick={() => detach.mutate(d.id)}>
