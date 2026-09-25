@@ -82,3 +82,4 @@ Still open for Phase 2: R-04 (document moved/deleted/access revoked — currentl
 | C-11 | Tags | **APPROVED** | The job-title field is presented as a tag set by a manager (e.g. "אחראי רכש"); existing tags are suggested to keep spelling consistent. |
 | C-12 | E-mail wording | PROPOSED (shown to owner) | Subject "{org} · {kind}: {task}"; plain-language due date ("מחר"/"היום"/date); role, status, latest status note and details (≤500 chars); button; signature with the org name. Text lives in `notifications/email-content.ts`. |
 | C-13 | Login page | PROPOSED | Shows the organisation name ("אשריך") with "ניהול משימות" underneath. |
+| C-14 | Task page order | PROPOSED | Header (title, status, edit button, people, due date, latest status note) → status update → details → documents → history (collapsed) → manager tools (collapsed). |

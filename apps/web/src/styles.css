@@ -199,3 +199,14 @@ button.secondary.warn { color: var(--danger); border-color: var(--danger); }
 .job-tag.large { font-size: 0.85rem; padding: 0.1rem 0.7rem; }
 .login-title { font-size: 2rem; margin-bottom: 0; }
 .login-subtitle { font-size: 1.1rem; margin: 0.1rem 0 0.25rem; }
+
+/* ---- Task page layout ---- */
+.row-inline.tight { gap: 0.4rem; flex-wrap: nowrap; }
+button.small-btn { padding: 0.2rem 0.75rem; font-size: 0.85rem; }
+details.collapsible > summary { list-style: none; display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+details.collapsible > summary::-webkit-details-marker { display: none; }
+details.collapsible > summary::before { content: '◂'; color: var(--muted); transition: transform 0.15s; }
+details.collapsible[open] > summary::before { transform: rotate(-90deg); }
+details.collapsible > summary h2 { margin: 0; }
+details.collapsible[open] > summary { margin-bottom: 0.75rem; }
+.detail .description { border-top: none; padding-top: 0; margin: 0; }

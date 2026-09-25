@@ -12,6 +12,7 @@ export function TaskDetailPage() {
   const me = useMe();
   const task = useTask(id);
   const people = usePeopleMap(me.data?.access !== 'link');
+  const [editing, setEditing] = useState(false);
 
   if (task.isLoading) return <p className="muted">טוען…</p>;
   if (task.error || !task.data) return <ErrorText error={task.error ?? new Error()} />;
@@ -20,6 +21,7 @@ export function TaskDetailPage() {
   const statusNote = latestStatusNote(t);
   // Personal pages exist for managers and permanent members only.
   const linkPeople = me.data?.access === 'manager' || me.data?.access === 'member';
+  const lastEvent = t.events.at(-1);
 
   return (
     <section className="detail">
@@ -31,7 +33,14 @@ export function TaskDetailPage() {
       <div className="card">
         <div className="page-head">
           <h1>{t.title}</h1>
-          <StatusBadge status={t.status} />
+          <div className="row-inline tight">
+            <StatusBadge status={t.status} />
+            {t.canEdit && !t.archivedAt && !editing && (
+              <button className="secondary small-btn" onClick={() => setEditing(true)}>
+                עריכה
+              </button>
+            )}
+          </div>
         </div>
         {t.archivedAt && <p className="notice">המשימה בארכיון ואינה ניתנת לעריכה.</p>}
         <dl className="facts">
@@ -57,22 +66,41 @@ export function TaskDetailPage() {
             </>
           )}
         </dl>
-        {t.description && <p className="description">{t.description}</p>}
         {statusNote && (
           <p className={`status-note status-${t.status}`}>
             <strong>{STATUS_LABEL[t.status]}:</strong> {statusNote.note}
             <span className="muted small"> · {formatDateTime(statusNote.at)}</span>
           </p>
         )}
-        <StatusActions task={t} />
       </div>
 
-      <TaskDocuments task={t} />
-      {t.canEdit && !t.archivedAt && <EditTask key={t.version} task={t} />}
-      {t.canEdit && <ManagerTools task={t} name={name} />}
+      {editing && <EditTask key={t.version} task={t} onClose={() => setEditing(false)} />}
 
-      <div className="card">
-        <h2>היסטוריה</h2>
+      {t.allowedStatuses.length > 0 && (
+        <div className="card">
+          <h2>עדכון סטטוס</h2>
+          <StatusActions task={t} />
+        </div>
+      )}
+
+      {t.description && (
+        <div className="card">
+          <h2>פרטים</h2>
+          <p className="description">{t.description}</p>
+        </div>
+      )}
+
+      <TaskDocuments task={t} />
+
+      <details className="card collapsible">
+        <summary>
+          <h2>היסטוריה</h2>
+          {lastEvent && (
+            <span className="muted small">
+              עודכן לאחרונה {formatDateTime(lastEvent.createdAt)} · {name(lastEvent.actorPersonId)}
+            </span>
+          )}
+        </summary>
         <ol className="history">
           {t.events.map((e) => (
             <li key={e.id}>
@@ -82,7 +110,9 @@ export function TaskDetailPage() {
             </li>
           ))}
         </ol>
-      </div>
+      </details>
+
+      {t.canEdit && <ManagerTools task={t} name={name} />}
     </section>
   );
 }
@@ -211,14 +241,13 @@ function latestStatusNote(task: TaskDetailDto): { note: string; at: string } | n
   return last && typeof note === 'string' && last.data.to === task.status ? { note, at: last.createdAt } : null;
 }
 
-function EditTask({ task }: { task: TaskDetailDto }) {
+function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void }) {
   const people = usePeopleMap();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [owner, setOwner] = useState(task.ownerPersonId);
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
   const [participants, setParticipants] = useState(task.participantIds);
-  const [open, setOpen] = useState(false);
   useEffect(() => setParticipants(task.participantIds), [task.participantIds]);
 
   const save = useApiMutation(async () => {
@@ -232,25 +261,19 @@ function EditTask({ task }: { task: TaskDetailDto }) {
     const next = participants.filter((p) => p !== owner);
     const same = next.length === task.participantIds.length && next.every((p) => task.participantIds.includes(p));
     if (!same) await api('PUT', `/api/tasks/${task.id}/participants`, { version: updated.version, participantIds: next });
+    // Closed here rather than in a mutate() callback: the refetch remounts this form (keyed by version).
+    onClose();
   });
 
-  if (!open)
-    return (
-      <div className="actions">
-        <button className="secondary" onClick={() => setOpen(true)}>
-          עריכת פרטים
-        </button>
-      </div>
-    );
   return (
     <form
       className="card stack"
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate(undefined, { onSuccess: () => setOpen(false) });
+        save.mutate(undefined);
       }}
     >
-      <h2>עריכה</h2>
+      <h2>עריכת המשימה</h2>
       <label>
         כותרת
         <input required value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -278,7 +301,7 @@ function EditTask({ task }: { task: TaskDetailDto }) {
         <button type="submit" disabled={save.isPending}>
           שמירה
         </button>
-        <button type="button" className="secondary" onClick={() => setOpen(false)}>
+        <button type="button" className="secondary" onClick={onClose}>
           ביטול
         </button>
       </div>
@@ -296,8 +319,11 @@ function ManagerTools({ task, name }: { task: TaskDetailDto; name: (id: string) 
   const involved = [task.ownerPersonId, ...task.participantIds];
 
   return (
-    <div className="card">
-      <h2>כלי ניהול</h2>
+    <details className="card collapsible">
+      <summary>
+        <h2>כלי ניהול</h2>
+        <span className="muted small">ארכיון וקישורי גישה</span>
+      </summary>
       <div className="actions">
         <button className="secondary" onClick={() => archive.mutate()} disabled={archive.isPending}>
           {task.archivedAt ? 'החזרה מהארכיון' : 'העברה לארכיון'}
@@ -321,6 +347,6 @@ function ManagerTools({ task, name }: { task: TaskDetailDto; name: (id: string) 
         </>
       )}
       <ErrorText error={archive.error ?? issue.error} />
-    </div>
+    </details>
   );
 }
