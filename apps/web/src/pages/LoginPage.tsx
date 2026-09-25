@@ -24,7 +24,7 @@ export function LoginPage() {
 
   const done = () => qc.invalidateQueries({ queryKey: ['me'] });
   const fail = (e: unknown) =>
-    setError(e instanceof ApiError && e.status === 403 ? 'לחשבון הזה אין גישה לארגון. פנו למנהל.' : 'ההתחברות נכשלה.');
+    setError(e instanceof ApiError && e.status === 403 ? 'לחשבון Google הזה אין גישה. אם צריך גישה, פנו למנהל.' : 'ההתחברות נכשלה.');
 
   const clientId = config.data?.googleClientId;
   useEffect(() => {
@@ -45,8 +45,9 @@ export function LoginPage() {
 
   return (
     <div className="center card narrow">
-      <h1>ניהול משימות הארגון</h1>
-      <p className="muted">מה צריך לעשות · מי אחראי · עד מתי · מה הסטטוס</p>
+      <h1 className="login-title">{config.data?.orgName ?? 'משימות'}</h1>
+      <p className="login-subtitle">ניהול משימות</p>
+      <p className="muted small">מה צריך לעשות · מי אחראי · עד מתי · מה הסטטוס</p>
       {clientId && <div ref={buttonRef} className="google-btn" />}
       {config.data && !clientId && !config.data.devLogin && <p className="error">ההתחברות עדיין לא הוגדרה (GOOGLE_CLIENT_ID).</p>}
       {config.data?.devLogin && (

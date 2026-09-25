@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createPersonSchema, devLoginSchema, googleLoginSchema, updateOrganizationSchema, updatePersonSchema } from '@org/shared';
 import type { AppContext } from '../../context';
+import { organizations } from '../../db/schema';
 import { clearSessionCookie, requirePrincipal, SESSION_COOKIE, setSessionCookie } from '../../http';
 import { AppError } from '../../lib/errors';
 import { parse } from '../../lib/validate';
@@ -20,6 +21,8 @@ const idParam = z.object({ id: z.uuid() });
 
 export function identityRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/auth/config', async () => ({
+    // Single-organisation deployment: the login page shows its name before anyone signs in.
+    orgName: (await ctx.db.select({ name: organizations.name }).from(organizations).limit(1))[0]?.name ?? null,
     googleClientId: ctx.config.GOOGLE_CLIENT_ID ?? null,
     devLogin: ctx.config.AUTH_DEV_LOGIN && ctx.config.NODE_ENV !== 'production',
   }));

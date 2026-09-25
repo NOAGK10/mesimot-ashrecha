@@ -81,7 +81,7 @@ export const useMe = () =>
   });
 
 export const useAuthConfig = () =>
-  useQuery({ queryKey: ['auth-config'], queryFn: () => api<{ googleClientId: string | null; devLogin: boolean }>('GET', '/api/auth/config') });
+  useQuery({ queryKey: ['auth-config'], queryFn: () => api<{ orgName: string | null; googleClientId: string | null; devLogin: boolean }>('GET', '/api/auth/config') });
 
 export const usePeople = (enabled = true) =>
   useQuery({ queryKey: ['people'], queryFn: () => api<PersonDto[]>('GET', '/api/people'), enabled, staleTime: 60_000 });

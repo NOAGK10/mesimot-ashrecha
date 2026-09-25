@@ -117,7 +117,7 @@ describe('HTTP API', () => {
     await dispatchDueNotifications(h.ctx);
     await dispatchDueNotifications(h.ctx);
     const subjects = h.mailer.sent.slice(0, h.mailer.sent.length - before).map((m) => m.subject);
-    expect(subjects.filter((s) => s.includes('Reminder test')).sort()).toEqual(['היום: Reminder test', 'משימה חדשה עבורך: Reminder test']);
+    expect(subjects.filter((s) => s.includes('Reminder test')).sort()).toEqual(['Test Org · היום: Reminder test', 'Test Org · משימה חדשה: Reminder test']);
 
     const rows = await h.ctx.db.select().from(notifications).where(eq(notifications.taskId, created.id));
     expect(rows.filter((r) => r.status === 'sent')).toHaveLength(2);

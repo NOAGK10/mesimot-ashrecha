@@ -1,9 +1,12 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { AppContext } from '../../context';
-import { notifications, people } from '../../db/schema';
+import { auditEvents, notifications, people } from '../../db/schema';
+import { todayIn } from '../../lib/dates';
+import { getOrg } from '../identity/org';
 import { issueMagicLink } from '../identity/auth-service';
 import { isOpen } from '../tasks/lifecycle';
 import { loadTask } from '../tasks/task-store';
+import { buildEmail } from './email-content';
 import type { MailMessage } from './mailer';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -12,23 +15,6 @@ const BATCH = 20;
 const MAX_ATTEMPTS = 5;
 /** A row stuck in 'sending' this long is assumed abandoned by a crashed worker and retried. */
 const STALE_CLAIM_MINUTES = 10;
-
-const SUBJECTS: Record<NotificationRow['kind'], (title: string) => string> = {
-  assigned: (t) => `משימה חדשה עבורך: ${t}`,
-  due_soon: (t) => `תזכורת: ${t}`,
-  due_today: (t) => `היום: ${t}`,
-  overdue: (t) => `באיחור: ${t}`,
-};
-const INTROS: Record<NotificationRow['kind'], string> = {
-  assigned: 'שובצת למשימה.',
-  due_soon: 'מועד היעד של המשימה מתקרב.',
-  due_today: 'מועד היעד של המשימה הוא היום.',
-  overdue: 'מועד היעד של המשימה עבר והיא עדיין פתוחה.',
-};
-
-const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const formatDate = (iso: string | null) => (iso ? iso.split('-').reverse().join('/') : 'ללא');
 
 /**
  * Claims due notifications with SKIP LOCKED, so several worker instances never send the same row,
@@ -88,14 +74,25 @@ async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMe
   if (task.archivedAt || (n.kind !== 'assigned' && !isOpen(task.status))) return null;
   if (task.ownerPersonId !== person.id && !task.participantIds.includes(person.id)) return null;
 
+  const org = await getOrg(ctx.db, task.orgId);
   // People with a login open the app; contacts without one get a task-scoped magic link.
   const url = person.role === null ? await issueMagicLink(ctx, ctx.db, person.id, task.id) : `${ctx.config.APP_URL}/tasks/${task.id}`;
-  const role = task.ownerPersonId === person.id ? 'אחראי' : 'משתתף';
-  const subject = SUBJECTS[n.kind](task.title);
-  const lines = [`שלום ${person.displayName},`, '', INTROS[n.kind], '', `משימה: ${task.title}`, `תפקידך: ${role}`, `יעד: ${formatDate(task.dueDate)}`, '', `לצפייה במשימה: ${url}`];
-  const html = `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.6">
-<p>שלום ${escapeHtml(person.displayName)},</p><p>${INTROS[n.kind]}</p>
-<p><strong>${escapeHtml(task.title)}</strong><br>תפקידך: ${role}<br>יעד: ${formatDate(task.dueDate)}</p>
-<p><a href="${escapeHtml(url)}">לצפייה במשימה</a></p></div>`;
-  return { to: person.email, subject, text: lines.join('\n'), html };
+  const [lastStatus] = await ctx.db
+    .select({ data: auditEvents.data })
+    .from(auditEvents)
+    .where(and(eq(auditEvents.entityType, 'task'), eq(auditEvents.entityId, task.id), eq(auditEvents.type, 'task.status_changed')))
+    .orderBy(desc(auditEvents.id))
+    .limit(1);
+  const note = lastStatus?.data.to === task.status && typeof lastStatus.data.note === 'string' ? lastStatus.data.note : null;
+
+  return buildEmail({
+    kind: n.kind,
+    orgName: org.name,
+    to: { name: person.displayName, email: person.email },
+    isOwner: task.ownerPersonId === person.id,
+    task: { title: task.title, description: task.description, status: task.status, dueDate: task.dueDate },
+    statusNote: note,
+    url,
+    today: todayIn(org.timezone, ctx.now()),
+  });
 }
