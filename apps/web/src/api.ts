@@ -90,6 +90,7 @@ export interface TaskFilters {
   view: TaskView;
   mine: boolean;
   ownerPersonId?: string;
+  personId?: string;
   status?: TaskStatus;
   includeArchived?: boolean;
 }
@@ -101,6 +102,7 @@ export const useTasks = (f: TaskFilters) =>
       const q = new URLSearchParams({ view: f.view });
       if (f.mine) q.set('mine', 'true');
       if (f.ownerPersonId) q.set('ownerPersonId', f.ownerPersonId);
+      if (f.personId) q.set('personId', f.personId);
       if (f.status) q.set('status', f.status);
       if (f.includeArchived) q.set('includeArchived', 'true');
       return api<TaskDto[]>('GET', `/api/tasks?${q}`);

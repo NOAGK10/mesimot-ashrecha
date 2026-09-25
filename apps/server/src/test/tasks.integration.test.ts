@@ -122,6 +122,36 @@ describe('task management', () => {
     await expect(getTaskDetail(h.ctx, h.guest, mine.id)).rejects.toMatchObject({ status: 404 });
   });
 
+  it('permanent members see all tasks but update only their own, and create tasks only for themselves', async () => {
+    const others = await createTask(h.ctx, h.manager, { ...base, title: 'Someone else', ownerPersonId: h.partner.personId, dueDate: null });
+    const theirs = await createTask(h.ctx, h.manager, { ...base, title: 'Member participates', ownerPersonId: h.partner.personId, dueDate: null, participantIds: [h.member.personId] });
+
+    const all = await listTasks(h.ctx, h.member, { view: 'all', mine: false, includeArchived: false });
+    expect(all.map((t) => t.id)).toEqual(expect.arrayContaining([others.id, theirs.id]));
+    const detail = await getTaskDetail(h.ctx, h.member, others.id);
+    expect(detail.allowedStatuses).toEqual([]);
+    expect(detail.canEdit).toBe(false);
+    await expect(changeStatus(h.ctx, h.member, others.id, { version: others.version, status: 'completed' })).rejects.toMatchObject({ status: 403 });
+    expect((await changeStatus(h.ctx, h.member, theirs.id, { version: theirs.version, status: 'in_progress' })).status).toBe('in_progress');
+    await expect(updateTask(h.ctx, h.member, theirs.id, { version: theirs.version + 1, title: 'x' })).rejects.toMatchObject({ status: 403 });
+
+    const own = await createTask(h.ctx, h.member, { ...base, title: 'My own', ownerPersonId: h.member.personId, dueDate: null });
+    expect(own.ownerPersonId).toBe(h.member.personId);
+    await expect(createTask(h.ctx, h.member, { ...base, title: 'For partner', ownerPersonId: h.partner.personId, dueDate: null })).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it('personal page lists the tasks a person owns or participates in', async () => {
+    const owned = await createTask(h.ctx, h.manager, { ...base, title: 'P-owned', ownerPersonId: h.contactId, dueDate: null });
+    const joined = await createTask(h.ctx, h.manager, { ...base, title: 'P-joined', ownerPersonId: h.manager.personId, dueDate: null, participantIds: [h.contactId] });
+    await createTask(h.ctx, h.manager, { ...base, title: 'P-other', ownerPersonId: h.manager.personId, dueDate: null });
+    const page = await listTasks(h.ctx, h.member, { view: 'all', mine: false, personId: h.contactId, includeArchived: false });
+    expect(page.filter((t) => t.title.startsWith('P-')).map((t) => t.id).sort()).toEqual([owned.id, joined.id].sort());
+    // A guest looking at someone else's page still sees only tasks shared with the guest.
+    expect(await listTasks(h.ctx, h.guest, { view: 'all', mine: false, personId: h.contactId, includeArchived: false })).toEqual([]);
+  });
+
   it('computes Today / This Week / Overdue / Future in the organisation timezone', async () => {
     // T0 = Sunday 2026-10-04 09:00 Jerusalem. Week ends Saturday 2026-10-10.
     const who = h.principal(h.partner.personId);

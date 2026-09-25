@@ -6,6 +6,7 @@ import { ErrorText, PeopleChecklist, PersonSelect, usePeopleMap } from '../compo
 
 export function NewTaskPage() {
   const me = useMe();
+  const isManager = me.data?.access === 'manager';
   const people = usePeopleMap();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
@@ -40,7 +41,12 @@ export function NewTaskPage() {
         <div className="row">
           <label>
             אחראי
-            <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
+            {isManager ? (
+              <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
+            ) : (
+              // Permanent members create tasks only for themselves.
+              <input value={me.data?.displayName ?? ''} disabled />
+            )}
           </label>
           <label>
             מועד יעד

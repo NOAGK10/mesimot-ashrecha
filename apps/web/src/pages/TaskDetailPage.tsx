@@ -18,6 +18,8 @@ export function TaskDetailPage() {
   const t = task.data;
   const name = (pid: string | null) => (pid ? (t.names[pid] ?? people.name(pid)) : 'המערכת');
   const statusNote = latestStatusNote(t);
+  // Personal pages exist for managers and permanent members only.
+  const linkPeople = me.data?.access === 'manager' || me.data?.access === 'member';
 
   return (
     <section className="detail">
@@ -35,7 +37,7 @@ export function TaskDetailPage() {
         <dl className="facts">
           <dt>אחראי</dt>
           <dd>
-            <PersonTag name={name(t.ownerPersonId)} jobTitle={t.jobTitles[t.ownerPersonId]} />
+            <PersonTag id={linkPeople ? t.ownerPersonId : undefined} name={name(t.ownerPersonId)} jobTitle={t.jobTitles[t.ownerPersonId]} />
           </dd>
           <dt>מועד יעד</dt>
           <dd className={t.isOverdue ? 'overdue' : ''}>
@@ -45,7 +47,7 @@ export function TaskDetailPage() {
           <dt>משתתפים</dt>
           <dd className="people-list">
             {t.participantIds.length
-              ? t.participantIds.map((pid) => <PersonTag key={pid} name={name(pid)} jobTitle={t.jobTitles[pid]} />)
+              ? t.participantIds.map((pid) => <PersonTag key={pid} id={linkPeople ? pid : undefined} name={name(pid)} jobTitle={t.jobTitles[pid]} />)
               : '—'}
           </dd>
           {t.recurrenceDefinitionId && (

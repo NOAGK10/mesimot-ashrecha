@@ -55,6 +55,7 @@ const reminderTarget = (t: TaskWithParticipants) => ({ ...t, open: isOpen(t.stat
 
 export async function createTask(ctx: AppContext, p: Principal, input: z.output<typeof createTaskSchema>): Promise<TaskDto> {
   if (!policy.canCreateTask(p)) throw forbidden();
+  if (!policy.canCreateTaskOwnedBy(p, input.ownerPersonId)) throw forbidden('You can create tasks only for yourself');
   const now = ctx.now();
   return ctx.db.transaction(async (tx) => {
     await assertActivePeople(tx, p.orgId, [input.ownerPersonId, ...input.participantIds]);
@@ -176,19 +177,21 @@ export async function listTasks(ctx: AppContext, p: Principal, q: z.output<typeo
   const todayDate = await today(ctx.db, p.orgId, now);
   const weekEnd = endOfWeek(todayDate);
 
-  const involvesMe = or(
-    eq(tasks.ownerPersonId, p.personId),
-    exists(
-      ctx.db
-        .select({ one: sql`1` })
-        .from(taskParticipants)
-        .where(and(eq(taskParticipants.taskId, tasks.id), eq(taskParticipants.personId, p.personId))),
-    ),
-  )!;
+  const involves = (personId: string) =>
+    or(
+      eq(tasks.ownerPersonId, personId),
+      exists(
+        ctx.db
+          .select({ one: sql`1` })
+          .from(taskParticipants)
+          .where(and(eq(taskParticipants.taskId, tasks.id), eq(taskParticipants.personId, personId))),
+      ),
+    )!;
 
   const where: SQL[] = [eq(tasks.orgId, p.orgId)];
   if (!q.includeArchived) where.push(isNull(tasks.archivedAt));
-  if (q.mine || !policy.canListOrgTasks(p)) where.push(involvesMe);
+  if (q.mine || !policy.canListOrgTasks(p)) where.push(involves(p.personId));
+  if (q.personId) where.push(involves(q.personId));
   if (q.ownerPersonId) where.push(eq(tasks.ownerPersonId, q.ownerPersonId));
   if (q.status) where.push(eq(tasks.status, q.status));
   else if (q.view !== 'all') where.push(inArray(tasks.status, [...OPEN_STATUSES]));

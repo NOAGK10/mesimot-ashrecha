@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import type { PersonDto, PersonRole } from '@org/shared';
 import { api, useApiMutation, usePeople } from '../api';
 import { ErrorText } from '../components/common';
 import { roleHint, roleLabel } from '../he';
 
 const KEYS = [['people']];
-const ROLES: PersonRole[] = ['manager', 'guest', null];
+const ROLES: PersonRole[] = ['manager', 'member', 'guest', null];
 const roleValue = (r: PersonRole) => r ?? 'contact';
 const parseRole = (v: string): PersonRole => (v === 'contact' ? null : (v as PersonRole));
 
@@ -22,7 +23,19 @@ function RoleSelect({ value, onChange }: { value: PersonRole; onChange: (r: Pers
 }
 
 /** A text field edited in place; saved when it loses focus. Empty means null unless `required`. */
-function InlineInput({ initial, onSave, placeholder, required }: { initial: string; onSave: (v: string | null) => void; placeholder?: string; required?: boolean }) {
+function InlineInput({
+  initial,
+  onSave,
+  placeholder,
+  required,
+  list,
+}: {
+  initial: string;
+  onSave: (v: string | null) => void;
+  placeholder?: string;
+  required?: boolean;
+  list?: string;
+}) {
   const [value, setValue] = useState(initial);
   return (
     <input
@@ -30,6 +43,7 @@ function InlineInput({ initial, onSave, placeholder, required }: { initial: stri
       maxLength={100}
       placeholder={placeholder}
       aria-label={placeholder}
+      list={list}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => {
         const v = value.trim();
@@ -52,7 +66,18 @@ export function PeoplePage() {
 
   return (
     <section>
-      <h1>אנשים</h1>
+      <div className="page-head">
+        <h1>ניהול אנשים</h1>
+        <Link className="button secondary-link" to="/team">
+          → לצוות
+        </Link>
+      </div>
+      {/* Tags already in use are suggested, so everyone gets the same spelling. */}
+      <datalist id="job-titles">
+        {[...new Set((people.data ?? []).map((x) => x.jobTitle).filter(Boolean))].map((t) => (
+          <option key={t} value={t!} />
+        ))}
+      </datalist>
       <div className="legend small">
         {ROLES.map((r) => (
           <p key={roleValue(r)}>
@@ -60,7 +85,7 @@ export function PeoplePage() {
           </p>
         ))}
         <p>
-          <strong>תפקיד בארגון</strong>: מופיע כתגית ליד השם בכל מקום באתר.
+          <strong>תגית (תפקיד בארגון)</strong>: למשל "אחראי רכש". מופיעה ליד השם בכל מקום באתר.
         </p>
       </div>
       <form
@@ -79,8 +104,8 @@ export function PeoplePage() {
           <input required type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label>
-          תפקיד בארגון
-          <input value={jobTitle} maxLength={100} onChange={(e) => setJobTitle(e.target.value)} placeholder="למשל: מגייס כספים" />
+          תגית
+          <input value={jobTitle} maxLength={100} list="job-titles" onChange={(e) => setJobTitle(e.target.value)} placeholder="למשל: אחראי רכש" />
         </label>
         <label>
           גישה לאתר
@@ -96,7 +121,7 @@ export function PeoplePage() {
         <thead>
           <tr>
             <th>שם</th>
-            <th>תפקיד בארגון</th>
+            <th>תגית</th>
             <th>מייל</th>
             <th>גישה לאתר</th>
             <th>מצב</th>
@@ -108,8 +133,8 @@ export function PeoplePage() {
               <td data-label="שם">
                 <InlineInput key={p.displayName} initial={p.displayName} required placeholder="שם" onSave={(v) => update.mutate({ p, patch: { displayName: v } })} />
               </td>
-              <td data-label="תפקיד בארגון">
-                <InlineInput key={p.jobTitle ?? ''} initial={p.jobTitle ?? ''} placeholder="למשל: מגייס כספים" onSave={(t) => update.mutate({ p, patch: { jobTitle: t } })} />
+              <td data-label="תגית">
+                <InlineInput key={p.jobTitle ?? ''} initial={p.jobTitle ?? ''} list="job-titles" placeholder="למשל: אחראי רכש" onSave={(t) => update.mutate({ p, patch: { jobTitle: t } })} />
               </td>
               <td data-label="מייל" dir="ltr">
                 {p.email}

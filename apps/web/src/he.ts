@@ -29,11 +29,14 @@ export const VIEW_LABEL: Record<TaskView, string> = {
 };
 
 /** Access level (what someone may do in the system) — distinct from their job title in the organisation. */
-export const roleLabel = (role: PersonRole) => (role === 'manager' ? 'מנהל' : role === 'guest' ? 'אורח' : 'איש קשר');
+export const roleLabel = (role: PersonRole) =>
+  role === 'manager' ? 'מנהל' : role === 'member' ? 'משתמש קבוע' : role === 'guest' ? 'אורח' : 'איש קשר';
 export const roleHint = (role: PersonRole) =>
   role === 'manager'
     ? 'רואה ומנהל את כל המשימות'
-    : role === 'guest'
+    : role === 'member'
+      ? 'רואה את כל המשימות, מעדכן את שלו ויוצר משימות לעצמו'
+      : role === 'guest'
       ? 'נכנס עם Google ורואה רק את המשימות שלו'
       : 'בלי כניסה לאתר. מקבל מיילים עם קישור למשימה';
 

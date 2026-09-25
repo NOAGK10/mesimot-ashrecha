@@ -13,6 +13,7 @@ import { DevOutboxPage } from './pages/DevOutboxPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { ImportPage } from './pages/ImportPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PersonPage, TeamPage } from './pages/TeamPage';
 
 export function App() {
   const me = useMe();
@@ -47,24 +48,28 @@ export function App() {
   }
 
   const isManager = me.data.access === 'manager';
+  // Managers and permanent members see the whole organisation; guests see only their own tasks.
+  const seesAll = isManager || me.data.access === 'member';
   return (
     <div className="shell">
       <header className="topbar">
         <span className="brand">{me.data.organization.name}</span>
         <nav className="nav">
           <NavLink to="/my">המשימות שלי</NavLink>
-          {isManager && <NavLink to="/all">כל המשימות</NavLink>}
+          {seesAll && <NavLink to="/all">כל המשימות</NavLink>}
+          {seesAll && <NavLink to="/team">צוות</NavLink>}
           {isManager && <NavLink to="/recurring">משימות חוזרות</NavLink>}
           {isManager && <NavLink to="/documents">מסמכים</NavLink>}
-          {isManager && <NavLink to="/people">אנשים</NavLink>}
         </nav>
         <UserMenu name={me.data.displayName} isManager={isManager} />
       </header>
       <main className="content">
         <Routes>
           <Route path="/my" element={<TasksPage scope="mine" />} />
-          {isManager && <Route path="/all" element={<TasksPage scope="all" />} />}
-          {isManager && <Route path="/tasks/new" element={<NewTaskPage />} />}
+          {seesAll && <Route path="/all" element={<TasksPage scope="all" />} />}
+          {seesAll && <Route path="/tasks/new" element={<NewTaskPage />} />}
+          {seesAll && <Route path="/team" element={<TeamPage />} />}
+          {seesAll && <Route path="/people/:id" element={<PersonPage />} />}
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           {isManager && <Route path="/recurring" element={<RecurrencesPage />} />}
           {isManager && <Route path="/documents" element={<DocumentsPage />} />}

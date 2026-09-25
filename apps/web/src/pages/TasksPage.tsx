@@ -6,9 +6,11 @@ import { useMe, useTasks } from '../api';
 import { PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { STATUS_LABEL, VIEW_LABEL, formatDate } from '../he';
 
-export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
+/** Task list: my tasks, the whole organisation, or one person's personal page. */
+export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person'; personId?: string }) {
   const me = useMe();
   const isManager = me.data?.access === 'manager';
+  const canCreate = isManager || me.data?.access === 'member';
   const [view, setView] = useState<TaskView>('all');
   const [owner, setOwner] = useState('');
   const [status, setStatus] = useState<TaskStatus | ''>('');
@@ -17,6 +19,7 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
   const tasks = useTasks({
     view,
     mine: scope === 'mine',
+    personId: scope === 'person' ? personId : undefined,
     ownerPersonId: owner || undefined,
     status: status || undefined,
     includeArchived,
@@ -25,12 +28,18 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
   return (
     <section>
       <div className="page-head">
-        <h1>{scope === 'mine' ? 'המשימות שלי' : 'כל משימות הארגון'}</h1>
-        {isManager && (
+        {scope === 'person' ? (
+          <PersonHeading name={people.name(personId!)} jobTitle={people.jobTitle(personId!)} />
+        ) : (
+          <h1>{scope === 'mine' ? 'המשימות שלי' : 'כל משימות הארגון'}</h1>
+        )}
+        {canCreate && scope !== 'person' && (
           <div className="actions tight">
-            <Link className="button secondary-link" to="/import">
-              ייבוא מגיליון
-            </Link>
+            {isManager && (
+              <Link className="button secondary-link" to="/import">
+                ייבוא מגיליון
+              </Link>
+            )}
             <Link className="button" to="/tasks/new">
               + משימה חדשה
             </Link>
@@ -100,7 +109,7 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
                   {t.archivedAt && <span className="tag">ארכיון</span>}
                 </td>
                 <td data-label="אחראי">
-                  <PersonTag name={people.name(t.ownerPersonId)} jobTitle={people.jobTitle(t.ownerPersonId)} />
+                  <PersonTag id={t.ownerPersonId} name={people.name(t.ownerPersonId)} jobTitle={people.jobTitle(t.ownerPersonId)} />
                 </td>
                 <td data-label="יעד" className={t.isOverdue ? 'overdue' : ''}>
                   {formatDate(t.dueDate)}
@@ -115,5 +124,17 @@ export function TasksPage({ scope }: { scope: 'mine' | 'all' }) {
         </table>
       )}
     </section>
+  );
+}
+
+function PersonHeading({ name, jobTitle }: { name: string; jobTitle: string | null }) {
+  return (
+    <div>
+      <h1 className="person-heading">
+        המשימות של {name}
+        {jobTitle && <span className="job-tag large">{jobTitle}</span>}
+      </h1>
+      <p className="muted small">משימות שהוא אחראי עליהן או משתתף בהן</p>
+    </div>
   );
 }

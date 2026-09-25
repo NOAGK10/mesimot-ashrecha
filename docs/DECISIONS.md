@@ -77,3 +77,6 @@ Still open for Phase 2: R-04 (document moved/deleted/access revoked — currentl
 | C-6 | Status screen | **APPROVED** | Moved from the main navigation into the name menu; a red dot appears only when the worker is unhealthy or notifications are failing/backlogged. |
 | C-7 | Organisation name | **APPROVED** | "אשריך". Editable by managers in the new Settings page (with reminder hour and "due soon" days; changing timing re-plans pending reminders). |
 | C-8 | People's names and job titles | **APPROVED** — change often | Not fixed in code: managers edit names and job titles inline on the People page. |
+| C-9 | Permanent users | **APPROVED** — supersedes D2/D3 | New access level `member` ("משתמש קבוע"): sees all organisation tasks and every personal page; changes status only on tasks they own or participate in; creates tasks only with themselves as owner (participants allowed). `guest` stays (sees only own tasks). Levels: manager · member · guest · contact. |
+| C-10 | Personal pages | **APPROVED** | Every person has a page with the tasks they own or participate in (`/people/:id`), reached from the new "צוות" page or by clicking a name. Available to managers and members. |
+| C-11 | Tags | **APPROVED** | The job-title field is presented as a tag set by a manager (e.g. "אחראי רכש"); existing tags are suggested to keep spelling consistent. |

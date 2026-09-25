@@ -51,6 +51,7 @@ export async function createHarness() {
   });
   const manager = principal(boss!.id);
   const guestPerson = await createPerson(ctx, manager, { displayName: 'Guest', email: 'guest@example.org', role: 'guest', jobTitle: null });
+  const memberPerson = await createPerson(ctx, manager, { displayName: 'Member', email: 'member@example.org', role: 'member', jobTitle: 'אחראי רכש' });
   const contactPerson = await createPerson(ctx, manager, { displayName: 'Contact', email: 'contact@example.org', role: null, jobTitle: 'רכזת מתנדבים' });
 
   return {
@@ -63,6 +64,7 @@ export async function createHarness() {
     manager,
     partner: principal(partner!.id),
     guest: principal(guestPerson.id, 'guest'),
+    member: principal(memberPerson.id, 'member'),
     contactId: contactPerson.id,
     principal,
     buildApp: () => buildApp(ctx, { ping: database.ping }),

@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import type { PersonDto, TaskStatus } from '@org/shared';
 import { ApiError, usePeople } from '../api';
 import { STATUS_LABEL } from '../he';
@@ -17,11 +18,17 @@ export function usePeopleMap(enabled = true) {
   };
 }
 
-/** A person's name with their job in the organisation as a small tag. */
-export function PersonTag({ name, jobTitle }: { name: string; jobTitle?: string | null }) {
+/** A person's name with their tag (job in the organisation). With `id`, links to their personal page. */
+export function PersonTag({ name, jobTitle, id }: { name: string; jobTitle?: string | null; id?: string }) {
   return (
     <span className="person">
-      {name}
+      {id ? (
+        <Link to={`/people/${id}`} className="person-link">
+          {name}
+        </Link>
+      ) : (
+        name
+      )}
       {jobTitle && <span className="job-tag">{jobTitle}</span>}
     </span>
   );

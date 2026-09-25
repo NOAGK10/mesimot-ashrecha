@@ -2,7 +2,7 @@
 export interface Principal {
   personId: string;
   orgId: string;
-  access: 'manager' | 'guest' | 'link';
+  access: 'manager' | 'member' | 'guest' | 'link';
   /** Only for magic-link sessions: the single task this caller may see. */
   scopeTaskId: string | null;
   via: 'session' | 'magic_link';

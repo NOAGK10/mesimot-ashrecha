@@ -6,7 +6,8 @@ export const TASK_STATUSES = ['new', 'in_progress', 'waiting', 'blocked', 'compl
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const OPEN_STATUSES: readonly TaskStatus[] = ['new', 'in_progress', 'waiting', 'blocked'];
 
-export const PERSON_ROLES = ['manager', 'guest'] as const;
+/** manager: everything · member: sees all, updates/creates own · guest: sees only own. */
+export const PERSON_ROLES = ['manager', 'member', 'guest'] as const;
 /** null role = contact without login (email / magic link only). */
 export type PersonRole = (typeof PERSON_ROLES)[number] | null;
 
@@ -65,6 +66,8 @@ export const listTasksQuerySchema = z.object({
   view: z.enum(TASK_VIEWS).default('all'),
   mine: z.coerce.boolean().default(false),
   ownerPersonId: uuid.optional(),
+  /** Tasks a person is involved in (owner or participant) — the personal page. */
+  personId: uuid.optional(),
   status: z.enum(TASK_STATUSES).optional(),
   includeArchived: z.coerce.boolean().default(false),
 });
@@ -291,7 +294,7 @@ export interface MeDto {
   personId: string;
   displayName: string;
   email: string;
-  access: 'manager' | 'guest' | 'link';
+  access: 'manager' | 'member' | 'guest' | 'link';
   scopeTaskId: string | null;
   organization: { id: string; name: string; timezone: string };
 }
