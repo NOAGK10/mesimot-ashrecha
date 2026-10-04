@@ -39,7 +39,8 @@ await build({
   target: 'node22',
   format: 'esm',
   // The embedded database is for local development only and is never loaded in production.
-  external: ['@electric-sql/pglite', 'pg-native'],
+  // drizzle's PGlite adapter must stay external too, or bundling turns its import into a load-time import.
+  external: ['@electric-sql/pglite', 'drizzle-orm/pglite', 'drizzle-orm/pglite/migrator', 'pg-native'],
   // Some dependencies are CommonJS and expect require/__dirname.
   banner: {
     js: "import { createRequire as __cr } from 'node:module'; import { fileURLToPath as __fu } from 'node:url'; import { dirname as __dn } from 'node:path'; const require = __cr(import.meta.url); const __filename = __fu(import.meta.url); const __dirname = __dn(__filename);",
