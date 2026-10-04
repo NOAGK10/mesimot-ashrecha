@@ -123,3 +123,11 @@ describe('reminder planning', () => {
     expect(endOfWeek('2026-10-10')).toBe('2026-10-10');
   });
 });
+
+describe('configuration', () => {
+  it('rejects an SMTP_URL that is not an smtp(s):// URL, naming the setting', async () => {
+    const { loadConfig } = await import('../config');
+    expect(() => loadConfig({ MAIL_TRANSPORT: 'smtp', SMTP_URL: 'abcdabcdabcdabcd' })).toThrow(/SMTP_URL|smtps:\/\//);
+    expect(() => loadConfig({ MAIL_TRANSPORT: 'smtp', SMTP_URL: ' smtps://a%40gmail.com:pw@smtp.gmail.com:465' })).not.toThrow();
+  });
+});

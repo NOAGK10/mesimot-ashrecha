@@ -30,7 +30,11 @@ const envSchema = z.object({
   WORKER_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
   RECURRENCE_HORIZON_DAYS: z.coerce.number().int().min(0).max(60).default(7),
   MAIL_TRANSPORT: z.enum(['console', 'smtp']).default('console'),
-  SMTP_URL: z.string().optional(),
+  SMTP_URL: z
+    .string()
+    .trim()
+    .regex(/^smtps?:\/\/\S+$/, 'must start with smtps:// (or smtp://) and contain no spaces')
+    .optional(),
   MAIL_FROM: z.string().default('Organization Tasks <no-reply@example.org>'),
   /** Comma-separated e-mails that become managers when the database is seeded. */
   BOOTSTRAP_MANAGER_EMAILS: z.string().default(''),
