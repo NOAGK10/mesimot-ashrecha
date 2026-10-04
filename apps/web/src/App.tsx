@@ -16,6 +16,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage, useInbox } from './pages/HomePage';
 import { Avatar } from './components/Avatar';
+import { TaskBoardPage } from './pages/TaskBoardPage';
 import { BoardPage } from './pages/BoardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PrivacyPage, TermsPage } from './pages/LegalPages';
@@ -61,13 +62,22 @@ export function App() {
     <div className="shell">
       <header className="topbar">
         <span className="brand">{me.data.organization.name}</span>
-        {/* Kept short on purpose: the four things people use every day, everything else under "עוד". */}
         <nav className="nav">
           <NavLink to="/home">בית</NavLink>
           <NavLink to="/tasks">משימות</NavLink>
+          <NavLink to="/task-board">לוח משימות</NavLink>
           <NavLink to="/board">לוח אחראים</NavLink>
           <NavLink to="/chat">צ'אט</NavLink>
-          {isManager && <MoreMenu />}
+          {isManager && (
+            <>
+              <NavLink to="/people" end>
+                ניהול אנשים
+              </NavLink>
+              <NavLink to="/recurring">משימות חוזרות</NavLink>
+              <NavLink to="/documents">מסמכים</NavLink>
+              <NavLink to="/import">ייבוא</NavLink>
+            </>
+          )}
         </nav>
         <Bell />
         <UserMenu name={me.data.displayName} personId={me.data.personId} isManager={isManager} />
@@ -82,6 +92,7 @@ export function App() {
           <Route path="/all" element={<Navigate to="/tasks?scope=org" replace />} />
           {canCreate && <Route path="/tasks/new" element={<NewTaskPage />} />}
           <Route path="/board" element={<BoardPage />} />
+          <Route path="/task-board" element={<TaskBoardPage />} />
           <Route path="/team" element={<Navigate to="/board" replace />} />
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           {isManager && <Route path="/recurring" element={<RecurrencesPage />} />}
@@ -94,30 +105,6 @@ export function App() {
         </Routes>
       </main>
     </div>
-  );
-}
-
-/** Managers' less frequent pages, out of the main menu. */
-function MoreMenu() {
-  const close = (e: React.MouseEvent<HTMLAnchorElement>) => e.currentTarget.closest('details')?.removeAttribute('open');
-  return (
-    <details className="user-menu more-menu">
-      <summary>עוד ▾</summary>
-      <div className="menu">
-        <Link to="/people" onClick={close}>
-          ניהול אנשים
-        </Link>
-        <Link to="/recurring" onClick={close}>
-          משימות חוזרות
-        </Link>
-        <Link to="/documents" onClick={close}>
-          מסמכים
-        </Link>
-        <Link to="/import" onClick={close}>
-          ייבוא מטבלה או ממסמך
-        </Link>
-      </div>
-    </details>
   );
 }
 
