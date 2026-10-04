@@ -18,6 +18,7 @@ import { HomePage, useInbox } from './pages/HomePage';
 import { Avatar } from './components/Avatar';
 import { TeamPage } from './pages/TeamPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { PrivacyPage, TermsPage } from './pages/LegalPages';
 
 export function App() {
   const me = useMe();
@@ -28,6 +29,9 @@ export function App() {
   }, [orgName]);
 
   if (location.pathname === '/link-expired') return <LinkExpired />;
+  // Public pages, required by Google to publish the sign-in app.
+  if (location.pathname === '/privacy') return <PrivacyPage />;
+  if (location.pathname === '/terms') return <TermsPage />;
   if (me.isLoading) return <div className="center muted">טוען…</div>;
   if (me.isError) return <div className="center error">שגיאה בטעינה. נסו לרענן את הדף.</div>;
   if (location.pathname === '/dev/outbox') return <DevOutboxPage />;

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, useAuthConfig } from '../api';
 
@@ -67,6 +68,9 @@ export function LoginPage() {
         </form>
       )}
       {error && <p className="error">{error}</p>}
+      <p className="muted small legal-links">
+        <Link to="/privacy">מדיניות פרטיות</Link> · <Link to="/terms">תנאי שימוש</Link>
+      </p>
     </div>
   );
 }

@@ -279,3 +279,9 @@ mark.mention { background: #e3ecff; color: #1d3f8f; border-radius: 4px; padding:
 .category-dot { width: 7px; height: 7px; border-radius: 50%; }
 .category-admin input[type=color] { width: 32px; height: 26px; padding: 0; border: none; background: none; flex: 0; min-width: 0; }
 .category-admin .category-chip { margin-inline-start: 0; }
+
+/* ---- Legal pages ---- */
+.legal { max-width: 760px; }
+.legal h2 { margin-top: 1.25rem; }
+.legal li { margin-bottom: 0.4rem; }
+.legal-links { margin-top: 1.5rem; }
