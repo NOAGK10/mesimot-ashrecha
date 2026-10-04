@@ -50,6 +50,10 @@ function describeStartupError(err: unknown): string[] {
   const message = err instanceof Error ? err.message : String(err);
   // Configuration checks name variables only; anything else (e.g. database errors) is summarised.
   if (/^[A-Z_]+ (is required|must)|^Production requires/.test(message)) return [message];
+  if (/relation .* does not exist|no such table/i.test(message)) return ['Database tables are missing: the migrations did not run during the build'];
   if (/ECONNREFUSED|ENOTFOUND|password authentication|database/i.test(message)) return ['Database connection failed: check DATABASE_URL'];
-  return ['See the function logs in Vercel for details'];
+  if (/Invalid URL|URL/i.test(message)) return ['A URL setting is malformed: check SMTP_URL and APP_URL'];
+  // Error class and code only — messages can contain secrets (e.g. connection strings).
+  const e = err as { name?: string; code?: string };
+  return [`${e.name ?? 'Error'}${e.code ? ` (${e.code})` : ''}: see the function logs in Vercel for details`];
 }
