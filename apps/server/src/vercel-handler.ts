@@ -39,6 +39,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     console.error('startup failed', err);
     res.statusCode = 500;
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ error: { code: 'startup_failed', message: 'The server could not start. Check the environment variables.' } }));
+    res.end(JSON.stringify({ error: { code: 'startup_failed', message: 'The server could not start. Check the environment variables.', details: describeStartupError(err) } }));
   }
+}
+
+/** Names the setting that is wrong — never its value — so the owner can fix it without reading server logs. */
+function describeStartupError(err: unknown): string[] {
+  const issues = (err as { issues?: Array<{ path: PropertyKey[]; message: string }> }).issues;
+  if (Array.isArray(issues)) return issues.map((i) => `${i.path.join('.')}: ${i.message}`);
+  const message = err instanceof Error ? err.message : String(err);
+  // Configuration checks name variables only; anything else (e.g. database errors) is summarised.
+  if (/^[A-Z_]+ (is required|must)|^Production requires/.test(message)) return [message];
+  if (/ECONNREFUSED|ENOTFOUND|password authentication|database/i.test(message)) return ['Database connection failed: check DATABASE_URL'];
+  return ['See the function logs in Vercel for details'];
 }
