@@ -54,6 +54,8 @@ function describeStartupError(err: unknown): string[] {
   if (/ECONNREFUSED|ENOTFOUND|password authentication|database/i.test(message)) return ['Database connection failed: check DATABASE_URL'];
   if (/Invalid URL|URL/i.test(message)) return ['A URL setting is malformed: check SMTP_URL and APP_URL'];
   // Error class and code only — messages can contain secrets (e.g. connection strings).
-  const e = err as { name?: string; code?: string };
-  return [`${e.name ?? 'Error'}${e.code ? ` (${e.code})` : ''}: see the function logs in Vercel for details`];
+  const e = err as { name?: string; code?: string; stack?: string };
+  // Stack frames (code locations only, without the message line) help locate a code fault.
+  const frames = (e.stack ?? '').split('\n').filter((l) => l.trim().startsWith('at ')).slice(0, 6).map((l) => l.trim().replace(/\(file:\/\/.*\/(index\.mjs:\d+:\d+)\)/, '($1)'));
+  return [`${e.name ?? 'Error'}${e.code ? ` (${e.code})` : ''}: see the function logs in Vercel for details`, ...frames];
 }
