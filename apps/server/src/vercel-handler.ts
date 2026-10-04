@@ -1,24 +1,32 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { FastifyInstance } from 'fastify';
+import { waitUntil } from '@vercel/functions';
 import { buildApp } from './app';
 import { bootstrap } from './bootstrap';
+import type { AppContext } from './context';
+import { dispatchDueNotifications } from './modules/notifications/dispatcher';
 import { bootstrapOrganization } from './seed';
 
 /**
  * Serverless entry for Vercel. One Fastify instance is kept per warm function instance.
  * There is no in-process worker here: background duties run through POST /api/cron/tick,
- * called by the GitHub Actions schedule (.github/workflows/tick.yml).
+ * called by the GitHub Actions schedule (.github/workflows/tick.yml). In addition, e-mails a
+ * request has just queued (new task, tag, feedback) are sent right after its response, so people
+ * do not wait for the next scheduled run.
  */
-let app: Promise<FastifyInstance> | null = null;
+let app: Promise<{ instance: FastifyInstance; ctx: AppContext }> | null = null;
 
-async function init(): Promise<FastifyInstance> {
+async function init(): Promise<{ instance: FastifyInstance; ctx: AppContext }> {
   const { ctx, database } = await bootstrap();
   const emails = ctx.config.BOOTSTRAP_MANAGER_EMAILS.split(',').map((e) => e.trim()).filter(Boolean);
   if (emails.length) await bootstrapOrganization(ctx, ctx.config.BOOTSTRAP_ORG_NAME, emails);
   const instance = await buildApp(ctx, { ping: database.ping });
   await instance.ready();
-  return instance;
+  return { instance, ctx };
 }
+
+/** Changes (POST/PUT/PATCH) may queue e-mails; reads never do. The cron endpoint sends on its own. */
+const mayQueueMail = (req: IncomingMessage) => !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET') && !req.url?.startsWith('/api/cron/');
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // Routing passes the original path as ?__p= so it survives the rewrite to this single function.
@@ -30,10 +38,28 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     req.url = original + (rest ? `?${rest}` : '');
   }
   try {
-    const instance = await (app ??= init().catch((err) => {
+    const { instance, ctx } = await (app ??= init().catch((err) => {
       app = null; // retry on the next request instead of caching the failure
       throw err;
     }));
+    if (mayQueueMail(req)) {
+      // Keep the function alive after the response until the queued e-mails are sent.
+      waitUntil(
+        new Promise<void>((resolve) => {
+          let started = false;
+          const send = () => {
+            if (started) return; // 'finish' and 'close' can both fire
+            started = true;
+            dispatchDueNotifications(ctx)
+              .catch((err) => ctx.log.error({ err }, 'immediate e-mail dispatch failed'))
+              .finally(resolve);
+          };
+          // 'close' also covers a client that disconnects before the response finishes.
+          res.once('finish', send);
+          res.once('close', send);
+        }),
+      );
+    }
     instance.server.emit('request', req, res);
   } catch (err) {
     console.error('startup failed', err);
