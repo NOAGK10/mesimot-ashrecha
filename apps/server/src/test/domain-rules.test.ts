@@ -138,3 +138,12 @@ describe('cron secret', () => {
     expect(loadConfig({ CRON_SECRET: '  abcdefghijklmnopqrstuvwxyz123456\n' }).CRON_SECRET).toBe('abcdefghijklmnopqrstuvwxyz123456');
   });
 });
+
+describe('pasted settings', () => {
+  it('drops invisible characters copied along with values (e.g. a zero-width space)', async () => {
+    const { loadConfig } = await import('../config');
+    const config = loadConfig({ GOOGLE_CLIENT_ID: '\u200B123-abc.apps.googleusercontent.com\uFEFF ', APP_URL: ' https://x.example\u200B' });
+    expect(config.GOOGLE_CLIENT_ID).toBe('123-abc.apps.googleusercontent.com');
+    expect(config.APP_URL).toBe('https://x.example');
+  });
+});

@@ -56,8 +56,18 @@ const envSchema = z.object({
 
 export type Config = z.infer<typeof envSchema>;
 
+/**
+ * Values pasted into hosting dashboards often carry invisible characters (zero-width spaces from
+ * translated pages, a BOM, surrounding whitespace). They break comparisons silently — e.g. Google
+ * rejects a client ID with a leading U+200B as "OAuth client was not found" — so strip them all.
+ */
+const INVISIBLE = /[​-‏‪-‮⁠-⁤﻿]/g;
+function cleanEnv(env: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  return Object.fromEntries(Object.entries(env).map(([k, v]) => [k, typeof v === 'string' ? v.replace(INVISIBLE, '').trim() : v]));
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const config = envSchema.parse(env);
+  const config = envSchema.parse(cleanEnv(env));
   if (config.NODE_ENV === 'production') {
     if (config.AUTH_DEV_LOGIN) throw new Error('AUTH_DEV_LOGIN must not be enabled in production');
     if (config.DATABASE_URL.startsWith('pglite:')) throw new Error('Production requires PostgreSQL');
