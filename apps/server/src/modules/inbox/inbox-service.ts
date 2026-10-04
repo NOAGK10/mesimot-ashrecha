@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { InboxItemDto, InboxKind } from '@org/shared';
 import type { AppContext } from '../../context';
 import type { Db } from '../../db/client';
-import { chatMessages, inboxItems, people, personFeedback, tasks } from '../../db/schema';
+import { chatMessages, inboxItems, notifications, people, personFeedback, tasks } from '../../db/schema';
 import type { Principal } from '../identity/principal';
 
 /**
@@ -31,7 +31,25 @@ export async function addInboxItems(tx: Db, items: NewInboxItem[]): Promise<void
     .where(and(inArray(people.id, [...new Set(wanted.map((i) => i.personId))]), sql`${people.role} is not null`, isNull(people.deactivatedAt)));
   const allowed = new Set(canSignIn.map((r) => r.id));
   const rows = wanted.filter((i) => allowed.has(i.personId));
-  if (rows.length) await tx.insert(inboxItems).values(rows);
+  if (rows.length === 0) return;
+  await tx.insert(inboxItems).values(rows);
+
+  // Tags and feedback are also e-mailed (APPROVED, docs/DECISIONS.md C-24). "Task assigned" already
+  // has its own e-mail from notifyAssigned, so it is not queued twice.
+  const emailed = rows.filter((i) => i.kind === 'mention' || i.kind === 'feedback');
+  if (emailed.length) {
+    await tx.insert(notifications).values(
+      emailed.map((i) => ({
+        orgId: i.orgId,
+        personId: i.personId,
+        kind: i.kind as 'mention' | 'feedback',
+        taskId: i.taskId ?? null,
+        messageId: i.messageId ?? null,
+        feedbackId: i.feedbackId ?? null,
+        sendAt: i.createdAt ?? new Date(),
+      })),
+    );
+  }
 }
 
 const EXCERPT = 140;

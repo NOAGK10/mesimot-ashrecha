@@ -113,3 +113,34 @@ ${p(`בהצלחה,<br>${escapeHtml(i.orgName)}`)}
 
   return { to: i.to.email, subject: subjectOf(i), text, html };
 }
+
+export interface SocialEmailInput {
+  kind: 'mention' | 'feedback';
+  orgName: string;
+  to: { name: string; email: string };
+  actorName: string;
+  /** For a tag in a task's chat; null for the general chat and for feedback. */
+  taskTitle: string | null;
+  body: string;
+  url: string;
+}
+
+/** E-mail for being tagged in a chat or receiving feedback. */
+export function buildSocialEmail(i: SocialEmailInput): MailMessage {
+  const where = i.taskTitle ? `במשימה „${i.taskTitle}”` : "בצ'אט הכללי";
+  const subject =
+    i.kind === 'mention' ? `${i.orgName} · ${i.actorName} תייג אותך ${where}` : `${i.orgName} · ${i.actorName} כתב לך פידבק`;
+  const intro = i.kind === 'mention' ? `${i.actorName} תייג אותך ${where}:` : `${i.actorName} כתב לך פידבק:`;
+  const button = i.kind === 'mention' ? 'לפתיחת השיחה' : 'לפרופיל שלך';
+  const quote = clip(i.body.trim(), 800);
+
+  const text = [`שלום ${i.to.name},`, '', intro, '', quote, '', `${button}: ${i.url}`, '', 'בהצלחה,', i.orgName].join('\n');
+  const html = `<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1c2230;max-width:560px">
+<p style="margin:0 0 12px">שלום ${escapeHtml(i.to.name)},</p>
+<p style="margin:0 0 12px">${escapeHtml(intro)}</p>
+<div style="border-inline-start:4px solid #2456c9;background:#f6f7f9;border-radius:6px;padding:10px 14px;margin:0 0 16px;white-space:pre-wrap">${escapeHtml(quote)}</div>
+<p style="margin:0 0 20px"><a href="${escapeHtml(i.url)}" style="background:#2456c9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${button}</a></p>
+<p style="margin:0">בהצלחה,<br>${escapeHtml(i.orgName)}</p>
+</div>`;
+  return { to: i.to.email, subject, text, html };
+}

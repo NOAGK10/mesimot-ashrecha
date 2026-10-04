@@ -1,12 +1,12 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { AppContext } from '../../context';
-import { auditEvents, notifications, people } from '../../db/schema';
+import { auditEvents, chatMessages, notifications, people, personFeedback } from '../../db/schema';
 import { todayIn } from '../../lib/dates';
 import { getOrg } from '../identity/org';
 import { issueMagicLink } from '../identity/auth-service';
 import { isOpen } from '../tasks/lifecycle';
 import { loadTask } from '../tasks/task-store';
-import { buildEmail } from './email-content';
+import { buildEmail, buildSocialEmail, type NotificationKind } from './email-content';
 import type { MailMessage } from './mailer';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -68,6 +68,8 @@ export async function dispatchDueNotifications(ctx: AppContext): Promise<{ sent:
 
 /** Returns null when the message is no longer relevant (task closed, person removed, …). */
 async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMessage | null> {
+  if (n.kind === 'mention' || n.kind === 'feedback') return buildSocialMessage(ctx, n);
+  if (!n.taskId) return null;
   const task = await loadTask(ctx.db, n.taskId);
   const [person] = await ctx.db.select().from(people).where(eq(people.id, n.personId));
   if (!task || !person || person.deactivatedAt) return null;
@@ -86,7 +88,7 @@ async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMe
   const note = lastStatus?.data.to === task.status && typeof lastStatus.data.note === 'string' ? lastStatus.data.note : null;
 
   return buildEmail({
-    kind: n.kind,
+    kind: n.kind as NotificationKind,
     orgName: org.name,
     to: { name: person.displayName, email: person.email },
     isOwner: task.ownerPersonId === person.id,
@@ -94,5 +96,45 @@ async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMe
     statusNote: note,
     url,
     today: todayIn(org.timezone, ctx.now()),
+  });
+}
+
+/** E-mail for a tag in a chat or for new feedback. Skipped if the message/feedback was deleted or the person left. */
+async function buildSocialMessage(ctx: AppContext, n: NotificationRow): Promise<MailMessage | null> {
+  const [person] = await ctx.db.select().from(people).where(eq(people.id, n.personId));
+  if (!person || person.deactivatedAt || person.role === null) return null;
+  const org = await getOrg(ctx.db, n.orgId);
+  const base = ctx.config.APP_URL;
+
+  if (n.kind === 'mention') {
+    if (!n.messageId) return null;
+    const [m] = await ctx.db.select().from(chatMessages).where(eq(chatMessages.id, n.messageId));
+    if (!m || m.deletedAt) return null;
+    const task = m.taskId ? await loadTask(ctx.db, m.taskId) : null;
+    if (m.taskId && (!task || task.archivedAt)) return null;
+    const [author] = await ctx.db.select({ name: people.displayName }).from(people).where(eq(people.id, m.authorPersonId));
+    return buildSocialEmail({
+      kind: 'mention',
+      orgName: org.name,
+      to: { name: person.displayName, email: person.email },
+      actorName: author?.name ?? 'מישהו',
+      taskTitle: task?.title ?? null,
+      body: m.body,
+      url: task ? `${base}/tasks/${task.id}#m${m.id}` : `${base}/chat#m${m.id}`,
+    });
+  }
+
+  if (!n.feedbackId) return null;
+  const [f] = await ctx.db.select().from(personFeedback).where(eq(personFeedback.id, n.feedbackId));
+  if (!f || f.deletedAt) return null;
+  const [author] = await ctx.db.select({ name: people.displayName }).from(people).where(eq(people.id, f.authorPersonId));
+  return buildSocialEmail({
+    kind: 'feedback',
+    orgName: org.name,
+    to: { name: person.displayName, email: person.email },
+    actorName: author?.name ?? 'מישהו',
+    taskTitle: null,
+    body: f.body,
+    url: `${base}/people/${person.id}#feedback`,
   });
 }

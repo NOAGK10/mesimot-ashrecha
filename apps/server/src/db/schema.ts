@@ -34,7 +34,7 @@ export const personRole = pgEnum('person_role', PERSON_ROLES);
 export const recurrenceMode = pgEnum('recurrence_mode', RECURRENCE_MODES);
 export const recurrenceFreq = pgEnum('recurrence_freq', RECURRENCE_FREQS);
 export const recurrenceState = pgEnum('recurrence_state', RECURRENCE_STATES);
-export const notificationKind = pgEnum('notification_kind', ['assigned', 'due_soon', 'due_today', 'overdue']);
+export const notificationKind = pgEnum('notification_kind', ['assigned', 'due_soon', 'due_today', 'overdue', 'mention', 'feedback']);
 export const notificationStatus = pgEnum('notification_status', ['pending', 'sending', 'sent', 'cancelled', 'failed']);
 export const actorType = pgEnum('actor_type', ['person', 'system']);
 
@@ -242,9 +242,12 @@ export const notifications = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     orgId: uuid('org_id').notNull().references(() => organizations.id),
-    taskId: uuid('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+    // Null for e-mails that are not about a task (a tag in the general chat, feedback).
+    taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
     personId: uuid('person_id').notNull().references(() => people.id),
     kind: notificationKind('kind').notNull(),
+    messageId: bigint('message_id', { mode: 'number' }).references(() => chatMessages.id, { onDelete: 'cascade' }),
+    feedbackId: bigint('feedback_id', { mode: 'number' }).references(() => personFeedback.id, { onDelete: 'cascade' }),
     sendAt: ts('send_at').notNull(),
     status: notificationStatus('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
