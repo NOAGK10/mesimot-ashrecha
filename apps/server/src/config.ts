@@ -45,6 +45,8 @@ const envSchema = z.object({
   CRON_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(0),
   /** Apply migrations when the API starts (hosts without a release step). */
   MIGRATE_ON_START: bool.default(false),
+  /** Connections per server instance. Keep small on serverless hosts (many short-lived instances). */
+  PG_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
 });
 
 export type Config = z.infer<typeof envSchema>;

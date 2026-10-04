@@ -15,9 +15,9 @@ export interface Database {
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-// Works both from src/db (tsx) and from dist/ (bundled).
+// Works from src/db (tsx), dist/ (bundled) and the Vercel function folder (migrations copied next to it).
 const migrationsFolder =
-  [path.resolve(here, '../../drizzle'), path.resolve(here, '../drizzle')].find((p) => existsSync(path.join(p, 'meta'))) ??
+  [path.resolve(here, '../../drizzle'), path.resolve(here, '../drizzle'), path.resolve(here, 'drizzle')].find((p) => existsSync(path.join(p, 'meta'))) ??
   path.resolve(here, '../drizzle');
 
 /**
@@ -26,7 +26,7 @@ const migrationsFolder =
  *   pglite:./.data/pglite   embedded PostgreSQL on disk (local development)
  *   pglite:memory           embedded PostgreSQL in memory (tests)
  */
-export async function openDatabase(url: string): Promise<Database> {
+export async function openDatabase(url: string, opts: { poolMax?: number } = {}): Promise<Database> {
   if (url.startsWith('pglite:')) {
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');
@@ -46,7 +46,7 @@ export async function openDatabase(url: string): Promise<Database> {
   const pg = await import('pg');
   const { drizzle } = await import('drizzle-orm/node-postgres');
   const { migrate } = await import('drizzle-orm/node-postgres/migrator');
-  const pool = new pg.default.Pool({ connectionString: url, max: 10 });
+  const pool = new pg.default.Pool({ connectionString: url, max: opts.poolMax ?? 10 });
   const db = drizzle(pool, { schema });
   return {
     db: db as unknown as Db,

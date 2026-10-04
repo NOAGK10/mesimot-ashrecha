@@ -19,7 +19,7 @@ export function createLogger(config: Config): Logger {
 export async function bootstrap(): Promise<{ ctx: AppContext; database: Database }> {
   const config = loadConfig();
   const log = createLogger(config);
-  const database = await openDatabase(config.DATABASE_URL);
+  const database = await openDatabase(config.DATABASE_URL, { poolMax: config.PG_POOL_MAX });
   // Embedded development database migrates itself; production runs `migrate` as a release step.
   if (database.kind === 'pglite') await database.migrate();
   const ctx: AppContext = {
