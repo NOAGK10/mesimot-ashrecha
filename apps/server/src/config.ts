@@ -44,7 +44,8 @@ const envSchema = z.object({
    * Free hosting sleeps when idle, so an external scheduler (GitHub Actions) calls POST /api/cron/tick
    * with this secret to run the background duties. Unset = endpoint disabled.
    */
-  CRON_SECRET: z.string().min(24).optional(),
+  // Trimmed: a space or newline copied along with the value must not break the comparison.
+  CRON_SECRET: z.string().trim().min(24).optional(),
   /** How often the external scheduler calls; only used to judge worker health. 0 = no scheduler. */
   CRON_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(0),
   /** Apply migrations when the API starts (hosts without a release step). */

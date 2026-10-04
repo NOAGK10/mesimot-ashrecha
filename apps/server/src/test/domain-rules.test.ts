@@ -131,3 +131,10 @@ describe('configuration', () => {
     expect(() => loadConfig({ MAIL_TRANSPORT: 'smtp', SMTP_URL: ' smtps://a%40gmail.com:pw@smtp.gmail.com:465' })).not.toThrow();
   });
 });
+
+describe('cron secret', () => {
+  it('ignores spaces and line breaks copied around the value', async () => {
+    const { loadConfig } = await import('../config');
+    expect(loadConfig({ CRON_SECRET: '  abcdefghijklmnopqrstuvwxyz123456\n' }).CRON_SECRET).toBe('abcdefghijklmnopqrstuvwxyz123456');
+  });
+});

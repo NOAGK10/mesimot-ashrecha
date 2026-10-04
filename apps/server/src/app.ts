@@ -73,7 +73,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions): Promise<Fasti
   const cronSecret = ctx.config.CRON_SECRET;
   if (cronSecret) {
     app.post('/api/cron/tick', async (req, reply) => {
-      const given = Buffer.from(String(req.headers['x-cron-secret'] ?? ''));
+      const given = Buffer.from(String(req.headers['x-cron-secret'] ?? '').trim());
       const expected = Buffer.from(cronSecret);
       if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
         return reply.code(401).send({ error: { code: 'unauthenticated', message: 'Bad cron secret' } });
