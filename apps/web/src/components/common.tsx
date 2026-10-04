@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import type { PersonDto, TaskStatus } from '@org/shared';
 import { ApiError, usePeople } from '../api';
 import { STATUS_LABEL } from '../he';
+import { Avatar } from './Avatar';
 
 export function StatusBadge({ status }: { status: TaskStatus }) {
   return <span className={`badge status-${status}`}>{STATUS_LABEL[status]}</span>;
@@ -18,10 +19,14 @@ export function usePeopleMap(enabled = true) {
   };
 }
 
-/** A person's name with their tag (job in the organisation). With `id`, links to their personal page. */
-export function PersonTag({ name, jobTitle, id }: { name: string; jobTitle?: string | null; id?: string }) {
+/**
+ * A person's name with their tag (job in the organisation). With `id`, links to their profile.
+ * With `avatarFor`, shows their photo or colour in front of the name.
+ */
+export function PersonTag({ name, jobTitle, id, avatarFor }: { name: string; jobTitle?: string | null; id?: string; avatarFor?: string }) {
   return (
     <span className="person">
+      {avatarFor && <Avatar personId={avatarFor} name={name} size={22} />}
       {id ? (
         <Link to={`/people/${id}`} className="person-link">
           {name}

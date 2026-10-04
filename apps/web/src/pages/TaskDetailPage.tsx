@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router';
 import type { TaskDetailDto } from '@org/shared';
 import { api, useApiMutation, useDocuments, useMe, useTask } from '../api';
 import { AddDocument, KIND_ICON, KIND_LABEL } from '../components/AddDocument';
+import { CategoryChip, CategorySelect } from '../components/Category';
+import { ChatPanel } from '../components/ChatPanel';
 import { ErrorText, PeopleChecklist, PersonSelect, PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { EVENT_LABEL, STATUS_LABEL, formatDate, formatDateTime, transitionLabel } from '../he';
 
@@ -46,8 +48,16 @@ export function TaskDetailPage() {
         <dl className="facts">
           <dt>אחראי</dt>
           <dd>
-            <PersonTag id={linkPeople ? t.ownerPersonId : undefined} name={name(t.ownerPersonId)} jobTitle={t.jobTitles[t.ownerPersonId]} />
+            <PersonTag id={linkPeople ? t.ownerPersonId : undefined} avatarFor={linkPeople ? t.ownerPersonId : undefined} name={name(t.ownerPersonId)} jobTitle={t.jobTitles[t.ownerPersonId]} />
           </dd>
+          {t.categoryId && (
+            <>
+              <dt>קטגוריה</dt>
+              <dd>
+                <CategoryChip categoryId={t.categoryId} />
+              </dd>
+            </>
+          )}
           <dt>מועד יעד</dt>
           <dd className={t.isOverdue ? 'overdue' : ''}>
             {formatDate(t.dueDate)}
@@ -56,7 +66,7 @@ export function TaskDetailPage() {
           <dt>משתתפים</dt>
           <dd className="people-list">
             {t.participantIds.length
-              ? t.participantIds.map((pid) => <PersonTag key={pid} id={linkPeople ? pid : undefined} name={name(pid)} jobTitle={t.jobTitles[pid]} />)
+              ? t.participantIds.map((pid) => <PersonTag key={pid} id={linkPeople ? pid : undefined} avatarFor={linkPeople ? pid : undefined} name={name(pid)} jobTitle={t.jobTitles[pid]} />)
               : '—'}
           </dd>
           {t.recurrenceDefinitionId && (
@@ -91,6 +101,13 @@ export function TaskDetailPage() {
       )}
 
       <TaskDocuments task={t} />
+
+      {me.data?.access !== 'link' && (
+        <div className="card">
+          <h2>שיחה על המשימה</h2>
+          <ChatPanel taskId={t.id} involvedIds={[t.ownerPersonId, ...t.participantIds]} />
+        </div>
+      )}
 
       <details className="card collapsible">
         <summary>
@@ -248,6 +265,7 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
   const [description, setDescription] = useState(task.description);
   const [owner, setOwner] = useState(task.ownerPersonId);
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
+  const [categoryId, setCategoryId] = useState(task.categoryId);
   const [participants, setParticipants] = useState(task.participantIds);
   useEffect(() => setParticipants(task.participantIds), [task.participantIds]);
 
@@ -258,6 +276,7 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
       description,
       ownerPersonId: owner,
       dueDate: dueDate || null,
+      categoryId,
     });
     const next = participants.filter((p) => p !== owner);
     const same = next.length === task.participantIds.length && next.every((p) => task.participantIds.includes(p));
@@ -293,6 +312,10 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </label>
       </div>
+      <label>
+        קטגוריה
+        <CategorySelect value={categoryId} onChange={setCategoryId} />
+      </label>
       <fieldset>
         <legend>משתתפים</legend>
         <PeopleChecklist people={people.list} selected={participants} exclude={owner} onChange={setParticipants} />

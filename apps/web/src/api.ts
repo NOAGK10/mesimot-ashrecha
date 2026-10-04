@@ -6,6 +6,7 @@ import type {
   MeDto,
   PersonDto,
   RecurrenceDto,
+  TaskCategoryDto,
   TaskDetailDto,
   TaskDto,
   TaskStatus,
@@ -66,6 +67,9 @@ export const useCategories = () =>
 export const useGoogleStatus = () =>
   useQuery({ queryKey: ['google-status'], queryFn: () => api<GoogleStatusDto>('GET', '/api/google/status'), staleTime: 60_000 });
 
+export const useTaskCategories = () =>
+  useQuery({ queryKey: ['task-categories'], queryFn: () => api<TaskCategoryDto[]>('GET', '/api/task-categories'), staleTime: 60_000 });
+
 export const useMe = () =>
   useQuery<MeDto | null>({
     queryKey: ['me'],
@@ -92,6 +96,7 @@ export interface TaskFilters {
   ownerPersonId?: string;
   personId?: string;
   q?: string;
+  categoryId?: string;
   status?: TaskStatus;
   includeArchived?: boolean;
 }
@@ -105,6 +110,7 @@ export const useTasks = (f: TaskFilters) =>
       if (f.ownerPersonId) q.set('ownerPersonId', f.ownerPersonId);
       if (f.personId) q.set('personId', f.personId);
       if (f.q) q.set('q', f.q);
+      if (f.categoryId) q.set('categoryId', f.categoryId);
       if (f.status) q.set('status', f.status);
       if (f.includeArchived) q.set('includeArchived', 'true');
       return api<TaskDto[]>('GET', `/api/tasks?${q}`);

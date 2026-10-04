@@ -57,6 +57,7 @@ export interface NewTask {
   recurrence?: { definitionId: string; occurrenceDate: IsoDate };
   /** Initial status; only imports start anywhere other than 'new'. */
   status?: TaskStatus;
+  categoryId?: string | null;
 }
 
 /**
@@ -73,6 +74,7 @@ export async function insertTask(tx: Db, t: NewTask, now: Date): Promise<TaskWit
       description: t.description,
       ownerPersonId: t.ownerPersonId,
       dueDate: t.dueDate,
+      categoryId: t.categoryId ?? null,
       createdByPersonId: t.createdByPersonId,
       recurrenceDefinitionId: t.recurrence?.definitionId ?? null,
       occurrenceDate: t.recurrence?.occurrenceDate ?? null,
@@ -98,6 +100,7 @@ export function toTaskDto(t: TaskWithParticipants, today: IsoDate): TaskDto {
     status: t.status,
     ownerPersonId: t.ownerPersonId,
     dueDate: t.dueDate,
+    categoryId: t.categoryId,
     recurrenceDefinitionId: t.recurrenceDefinitionId,
     occurrenceDate: t.occurrenceDate,
     participantIds: t.participantIds,

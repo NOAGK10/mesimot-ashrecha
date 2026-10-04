@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { TaskDto } from '@org/shared';
 import { api, useApiMutation, useMe } from '../api';
+import { CategorySelect } from '../components/Category';
 import { ErrorText, PeopleChecklist, PersonSelect, usePeopleMap } from '../components/common';
 
 export function NewTaskPage() {
@@ -14,6 +15,7 @@ export function NewTaskPage() {
   const [owner, setOwner] = useState(me.data?.personId ?? '');
   const [dueDate, setDueDate] = useState('');
   const [participants, setParticipants] = useState<string[]>([]);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
 
   const create = useApiMutation((body: unknown) => api<TaskDto>('POST', '/api/tasks', body));
 
@@ -25,7 +27,7 @@ export function NewTaskPage() {
         onSubmit={(e) => {
           e.preventDefault();
           create.mutate(
-            { title, description, ownerPersonId: owner, dueDate: dueDate || null, participantIds: participants.filter((p) => p !== owner) },
+            { title, description, ownerPersonId: owner, dueDate: dueDate || null, participantIds: participants.filter((p) => p !== owner), categoryId },
             { onSuccess: (t) => navigate(`/tasks/${t.id}`) },
           );
         }}
@@ -53,6 +55,10 @@ export function NewTaskPage() {
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </label>
         </div>
+        <label>
+          קטגוריה
+          <CategorySelect value={categoryId} onChange={setCategoryId} />
+        </label>
         <fieldset>
           <legend>משתתפים</legend>
           <PeopleChecklist people={people.list} selected={participants} exclude={owner} onChange={setParticipants} />

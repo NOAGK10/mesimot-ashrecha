@@ -24,6 +24,8 @@ export interface GoogleWorkspace {
   accessToken(refreshToken: string): Promise<string>;
   getFile(refreshToken: string, fileId: string): Promise<GoogleFileMeta | null>;
   readSpreadsheet(refreshToken: string, fileId: string): Promise<SourceTable[] | null>;
+  /** A Google Doc exported as .docx, or null when not accessible. */
+  exportDocx(refreshToken: string, fileId: string): Promise<Buffer | null>;
   /** Uploads a file into the user's Drive, converting Office files to Google Docs/Sheets. */
   upload(refreshToken: string, file: { name: string; mimeType: string; data: Buffer }): Promise<GoogleFileMeta>;
   revoke(refreshToken: string): Promise<void>;
@@ -32,7 +34,11 @@ export interface GoogleWorkspace {
 /** Reads a Google Sheet that is shared "anyone with the link", without any authorization. */
 export interface PublicSheets {
   fetchCsv(fileId: string): Promise<string | null>;
+  /** A Google Doc shared "anyone with the link", exported as .docx. */
+  fetchDocx(fileId: string): Promise<Buffer | null>;
 }
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 const CONVERT: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'application/vnd.google-apps.document',
@@ -107,6 +113,20 @@ export function googleWorkspace(clientId: string, clientSecret: string): GoogleW
       }
     },
 
+    async exportDocx(refreshToken, fileId) {
+      try {
+        const res = await clientFor(refreshToken).request<ArrayBuffer>({
+          url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export`,
+          params: { mimeType: DOCX_MIME },
+          responseType: 'arraybuffer',
+        });
+        return Buffer.from(res.data);
+      } catch (err) {
+        if (notFound(err)) return null;
+        throw err;
+      }
+    },
+
     async upload(refreshToken, file) {
       const boundary = `b${Date.now().toString(36)}`;
       const metadata = { name: file.name.replace(/\.[^.]+$/, ''), mimeType: CONVERT[file.mimeType] ?? file.mimeType };
@@ -140,6 +160,13 @@ export const publicSheets: PublicSheets = {
     const type = res.headers.get('content-type') ?? '';
     if (!res.ok || !type.includes('text/csv')) return null;
     return res.text();
+  },
+  async fetchDocx(fileId) {
+    if (!/^[\w-]{10,200}$/.test(fileId)) return null;
+    const res = await fetch(`https://docs.google.com/document/d/${fileId}/export?format=docx`, { redirect: 'follow' });
+    const type = res.headers.get('content-type') ?? '';
+    if (!res.ok || !type.includes('officedocument')) return null;
+    return Buffer.from(await res.arrayBuffer());
   },
 };
 

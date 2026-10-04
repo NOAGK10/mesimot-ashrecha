@@ -46,7 +46,7 @@ export async function connectGoogle(status: GoogleStatusDto): Promise<void> {
   });
 }
 
-export type PickKind = 'sheets' | 'docs' | 'any';
+export type PickKind = 'sheets' | 'docs' | 'sheets_docs' | 'any';
 
 /** Shows the Google Picker. Resolves to the picked file id, or null if the user closed it. */
 export async function pickFromDrive(status: GoogleStatusDto, kind: PickKind): Promise<string | null> {
@@ -60,6 +60,7 @@ export async function pickFromDrive(status: GoogleStatusDto, kind: PickKind): Pr
       : kind === 'docs'
         ? new picker.DocsView(picker.ViewId.DOCUMENTS)
         : new picker.DocsView(picker.ViewId.DOCS);
+  if (kind === 'sheets_docs') view.setMimeTypes('application/vnd.google-apps.spreadsheet,application/vnd.google-apps.document');
   view.setMode(picker.DocsViewMode.LIST);
   return new Promise((resolve) => {
     new picker.PickerBuilder()

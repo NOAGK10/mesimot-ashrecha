@@ -34,7 +34,7 @@ export async function createHarness() {
       verify: async (credential) => (credential.startsWith('google:') ? { sub: `sub-${credential}`, email: credential.slice(7) } : null),
     },
     googleWorkspace: { api: fakeDrive.api, secrets: new SecretBox(randomBytes(32).toString('base64')) },
-    publicSheets: { fetchCsv: async (id) => fakeDrive.publicCsv.get(id) ?? null },
+    publicSheets: { fetchCsv: async (id) => fakeDrive.publicCsv.get(id) ?? null, fetchDocx: async (id) => fakeDrive.publicDocx.get(id) ?? null },
     log: pino({ level: 'silent' }),
     now: () => clock.now,
   };
@@ -76,8 +76,9 @@ export type Harness = Awaited<ReturnType<typeof createHarness>>;
 
 /** In-memory stand-in for Google Drive/Sheets. Files are visible only when "picked" (drive.file semantics). */
 export function createFakeDrive() {
-  const files = new Map<string, GoogleFileMeta & { tables?: SourceTable[] }>();
+  const files = new Map<string, GoogleFileMeta & { tables?: SourceTable[]; docx?: Buffer }>();
   const publicCsv = new Map<string, string>();
+  const publicDocx = new Map<string, Buffer>();
   const tokens = new Set<string>();
   const check = (t: string) => {
     if (!tokens.has(t)) throw new Error('bad token');
@@ -100,6 +101,10 @@ export function createFakeDrive() {
       check(t);
       return files.get(id)?.tables ?? null;
     },
+    async exportDocx(t, id) {
+      check(t);
+      return files.get(id)?.docx ?? null;
+    },
     async upload(t, file) {
       check(t);
       const id = `uploaded${files.size.toString().padStart(8, '0')}`;
@@ -114,5 +119,7 @@ export function createFakeDrive() {
   };
   const addSheet = (id: string, name: string, tables: SourceTable[]) =>
     files.set(id, { id, name, mimeType: 'application/vnd.google-apps.spreadsheet', webViewLink: `https://docs.google.com/spreadsheets/d/${id}/edit`, tables });
-  return { api, files, publicCsv, addSheet };
+  const addDoc = (id: string, name: string, docx: Buffer) =>
+    files.set(id, { id, name, mimeType: 'application/vnd.google-apps.document', webViewLink: `https://docs.google.com/document/d/${id}/edit`, docx });
+  return { api, files, publicCsv, publicDocx, addSheet, addDoc };
 }

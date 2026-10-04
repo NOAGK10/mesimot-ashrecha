@@ -7,6 +7,8 @@ import multipart from '@fastify/multipart';
 import type { AppContext } from './context';
 import { attachPrincipal, requirePrincipal } from './http';
 import { AppError, forbidden } from './lib/errors';
+import { chatRoutes } from './modules/chat/routes';
+import { profileRoutes } from './modules/profiles/routes';
 import { documentRoutes } from './modules/documents/routes';
 import { googleRoutes } from './modules/google/routes';
 import { identityRoutes } from './modules/identity/routes';
@@ -64,6 +66,8 @@ export async function buildApp(ctx: AppContext, opts: AppOptions): Promise<Fasti
   documentRoutes(app, ctx);
   importRoutes(app, ctx);
   googleRoutes(app, ctx);
+  chatRoutes(app, ctx);
+  profileRoutes(app, ctx);
 
   // Wake-up call from the external scheduler (free hosting sleeps, so the in-process loop is not enough).
   const cronSecret = ctx.config.CRON_SECRET;

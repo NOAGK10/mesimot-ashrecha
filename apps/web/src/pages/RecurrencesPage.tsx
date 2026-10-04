@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RecurrenceDto } from '@org/shared';
 import { api, useApiMutation, useMe, useRecurrences } from '../api';
+import { CategoryChip, CategorySelect } from '../components/Category';
 import { ErrorText, PeopleChecklist, PersonSelect, usePeopleMap } from '../components/common';
 import { WEEKDAYS, formatDate } from '../he';
 
@@ -46,7 +47,9 @@ export function RecurrencesPage() {
         {list.data?.map((r) => (
           <div key={r.id} className={`card recurrence state-${r.state}`}>
             <div className="page-head">
-              <h2>{r.title}</h2>
+              <h2>
+                {r.title} <CategoryChip categoryId={r.categoryId} />
+              </h2>
               <span className="badge">{STATE_LABEL[r.state]}</span>
             </div>
             <p>{describe(r)}</p>
@@ -90,6 +93,7 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
   const [weekdays, setWeekdays] = useState<number[]>([0]);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState('');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
 
   const create = useApiMutation(
     () =>
@@ -103,6 +107,7 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
         byWeekday: mode === 'schedule' && freq === 'weekly' ? weekdays : [],
         startDate,
         endDate: endDate || null,
+        categoryId,
       }),
     KEYS,
   );
@@ -166,10 +171,16 @@ function CreateRecurrence({ onDone }: { onDone: () => void }) {
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </label>
       </div>
-      <label>
-        אחראי
-        <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
-      </label>
+      <div className="row">
+        <label>
+          אחראי
+          <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
+        </label>
+        <label>
+          קטגוריה
+          <CategorySelect value={categoryId} onChange={setCategoryId} />
+        </label>
+      </div>
       <fieldset>
         <legend>משתתפים</legend>
         <PeopleChecklist people={people.list} selected={participants} exclude={owner} onChange={setParticipants} />
@@ -191,6 +202,7 @@ function EditRecurrence({ r, onDone }: { r: RecurrenceDto; onDone: () => void })
   const [owner, setOwner] = useState(r.ownerPersonId);
   const [participants, setParticipants] = useState(r.participantIds);
   const [endDate, setEndDate] = useState(r.endDate ?? '');
+  const [categoryId, setCategoryId] = useState(r.categoryId);
   const save = useApiMutation(async () => {
     await api('PATCH', `/api/recurrences/${r.id}`, {
       version: r.version,
@@ -199,6 +211,7 @@ function EditRecurrence({ r, onDone }: { r: RecurrenceDto; onDone: () => void })
       ownerPersonId: owner,
       participantIds: participants.filter((p) => p !== owner),
       endDate: endDate || null,
+      categoryId,
     });
     onDone();
   }, KEYS);
@@ -223,6 +236,10 @@ function EditRecurrence({ r, onDone }: { r: RecurrenceDto; onDone: () => void })
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </label>
       </div>
+      <label>
+        קטגוריה
+        <CategorySelect value={categoryId} onChange={setCategoryId} />
+      </label>
       <fieldset>
         <legend>משתתפים</legend>
         <PeopleChecklist people={people.list} selected={participants} exclude={owner} onChange={setParticipants} />

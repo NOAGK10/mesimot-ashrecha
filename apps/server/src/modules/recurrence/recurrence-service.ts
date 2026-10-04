@@ -12,6 +12,7 @@ import { notifyAssigned, replanReminders } from '../notifications/scheduling';
 import { getOrg } from '../identity/org';
 import { policy } from '../identity/policy';
 import { SYSTEM_ACTOR, actorOf, type Actor, type Principal } from '../identity/principal';
+import { assertTaskCategory } from '../tasks/category-service';
 import { assertActivePeople, insertTask, type TaskWithParticipants } from '../tasks/task-store';
 import { afterCompletion, scheduledAfter, scheduledOnOrAfter, type RecurrenceRule } from './rules';
 
@@ -49,6 +50,7 @@ function toDto(d: DefinitionRow, participantIds: string[]): RecurrenceDto {
     title: d.title,
     description: d.description,
     ownerPersonId: d.ownerPersonId,
+    categoryId: d.categoryId,
     participantIds,
     mode: d.mode,
     freq: d.freq,
@@ -79,6 +81,7 @@ async function createOccurrence(
       title: def.title,
       description: def.description,
       ownerPersonId: def.ownerPersonId,
+      categoryId: def.categoryId,
       dueDate: occurrenceDate,
       participantIds,
       createdByPersonId: null,
@@ -197,6 +200,7 @@ export async function createRecurrence(
   const now = ctx.now();
   return ctx.db.transaction(async (tx) => {
     await assertActivePeople(tx, p.orgId, [input.ownerPersonId, ...input.participantIds]);
+    await assertTaskCategory(tx, p.orgId, input.categoryId);
     const org = await getOrg(tx, p.orgId);
     const rule: RecurrenceRule = { ...input };
     const firstDate = input.mode === 'schedule' ? scheduledOnOrAfter(rule, input.startDate) : input.startDate;
@@ -204,7 +208,7 @@ export async function createRecurrence(
 
     const [def] = await tx
       .insert(recurrenceDefinitions)
-      .values({ ...input, orgId: p.orgId, nextOccurrenceDate: input.mode === 'schedule' ? firstDate : null, createdByPersonId: p.personId, createdAt: now, updatedAt: now })
+      .values({ ...input, categoryId: input.categoryId ?? null, orgId: p.orgId, nextOccurrenceDate: input.mode === 'schedule' ? firstDate : null, createdByPersonId: p.personId, createdAt: now, updatedAt: now })
       .returning();
     const participantIds = [...new Set(input.participantIds)].filter((id) => id !== input.ownerPersonId);
     if (participantIds.length) {
@@ -256,6 +260,7 @@ export async function updateRecurrence(
     const def = await lockDefinition(tx, p, id, input.version);
     if (def.state === 'ended') throw invalid('This recurrence has ended');
     const { version: _v, participantIds, ...fields } = input;
+    if (fields.categoryId !== undefined) await assertTaskCategory(tx, p.orgId, fields.categoryId);
     if (fields.ownerPersonId) await assertActivePeople(tx, p.orgId, [fields.ownerPersonId]);
     if (fields.endDate && fields.endDate < def.startDate) throw invalid('End date must not be before start date');
 

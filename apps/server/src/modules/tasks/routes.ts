@@ -5,17 +5,34 @@ import {
   createTaskSchema,
   listTasksQuerySchema,
   setParticipantsSchema,
+  taskCategorySchema,
   updateTaskSchema,
   versionOnlySchema,
 } from '@org/shared';
 import type { AppContext } from '../../context';
 import { requirePrincipal } from '../../http';
 import { parse } from '../../lib/validate';
+import { createTaskCategory, deleteTaskCategory, listTaskCategories, updateTaskCategory } from './category-service';
 import { changeStatus, createTask, getTaskDetail, listTasks, setArchived, setParticipants, updateTask } from './task-service';
 
 const idParam = z.object({ id: z.uuid() });
 
+const categoryParams = z.object({ id: z.uuid() });
+
 export function taskRoutes(app: FastifyInstance, ctx: AppContext): void {
+  app.get('/api/task-categories', async (req) => listTaskCategories(ctx, requirePrincipal(req)));
+  app.post('/api/task-categories', async (req, reply) => {
+    const category = await createTaskCategory(ctx, requirePrincipal(req), parse(taskCategorySchema, req.body));
+    return reply.code(201).send(category);
+  });
+  app.patch('/api/task-categories/:id', async (req) =>
+    updateTaskCategory(ctx, requirePrincipal(req), parse(categoryParams, req.params).id, parse(taskCategorySchema, req.body)),
+  );
+  app.delete('/api/task-categories/:id', async (req) => {
+    await deleteTaskCategory(ctx, requirePrincipal(req), parse(categoryParams, req.params).id);
+    return { ok: true };
+  });
+
   app.get('/api/tasks', async (req) => listTasks(ctx, requirePrincipal(req), parse(listTasksQuerySchema, req.query)));
 
   app.post('/api/tasks', async (req, reply) => {

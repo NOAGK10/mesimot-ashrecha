@@ -29,6 +29,27 @@
       "when": 1790334604695,
       "tag": "0003_member_role",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791107296232,
+      "tag": "0004_chat_and_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791107855345,
+      "tag": "0005_profiles_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791108992521,
+      "tag": "0006_task_categories",
+      "breakpoints": true
     }
   ]
 }

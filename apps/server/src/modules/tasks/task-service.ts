@@ -22,6 +22,7 @@ import { policy } from '../identity/policy';
 import { actorOf, type Principal } from '../identity/principal';
 import { cancelPendingReminders, notifyAssigned, replanReminders } from '../notifications/scheduling';
 import { onOccurrenceCompleted } from '../recurrence/recurrence-service';
+import { assertTaskCategory } from './category-service';
 import { allowedTransitions, assertTransition, isOpen } from './lifecycle';
 import { assertActivePeople, insertTask, loadTask, participantsOf, toTaskDto, type TaskWithParticipants } from './task-store';
 
@@ -59,6 +60,7 @@ export async function createTask(ctx: AppContext, p: Principal, input: z.output<
   const now = ctx.now();
   return ctx.db.transaction(async (tx) => {
     await assertActivePeople(tx, p.orgId, [input.ownerPersonId, ...input.participantIds]);
+    await assertTaskCategory(tx, p.orgId, input.categoryId);
     const task = (await insertTask(tx, { ...input, orgId: p.orgId, createdByPersonId: p.personId }, now))!;
     await recordAudit(tx, {
       orgId: p.orgId,
@@ -66,7 +68,7 @@ export async function createTask(ctx: AppContext, p: Principal, input: z.output<
       entityId: task.id,
       type: 'task.created',
       actor: actorOf(p),
-      data: { title: task.title, ownerPersonId: task.ownerPersonId, dueDate: task.dueDate, participantIds: task.participantIds },
+      data: { title: task.title, ownerPersonId: task.ownerPersonId, dueDate: task.dueDate, participantIds: task.participantIds, categoryId: task.categoryId },
     });
     await notifyAssigned(tx, task, [task.ownerPersonId, ...task.participantIds], p.personId, now);
     await replanReminders(tx, reminderTarget(task), now);
@@ -90,6 +92,11 @@ export async function updateTask(ctx: AppContext, p: Principal, id: string, inpu
     if (input.description !== undefined && input.description !== task.description) (patch.description = input.description), (details.description = true);
     if (Object.keys(details).length) await audit('task.updated', details);
 
+    if (input.categoryId !== undefined && input.categoryId !== task.categoryId) {
+      await assertTaskCategory(tx, p.orgId, input.categoryId);
+      patch.categoryId = input.categoryId;
+      await audit('task.category_changed', { from: task.categoryId, to: input.categoryId });
+    }
     if (input.dueDate !== undefined && input.dueDate !== task.dueDate) {
       patch.dueDate = input.dueDate;
       await audit('task.due_date_changed', { from: task.dueDate, to: input.dueDate });
@@ -198,6 +205,7 @@ export async function listTasks(ctx: AppContext, p: Principal, q: z.output<typeo
     where.push(or(ilike(tasks.title, pattern), ilike(tasks.description, pattern))!);
   }
   if (q.ownerPersonId) where.push(eq(tasks.ownerPersonId, q.ownerPersonId));
+  if (q.categoryId) where.push(q.categoryId === 'none' ? isNull(tasks.categoryId) : eq(tasks.categoryId, q.categoryId));
   if (q.status) where.push(eq(tasks.status, q.status));
   else if (q.view !== 'all') where.push(inArray(tasks.status, [...OPEN_STATUSES]));
 

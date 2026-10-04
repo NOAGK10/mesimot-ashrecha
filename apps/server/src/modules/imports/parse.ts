@@ -67,5 +67,5 @@ export async function parseUpload(filename: string, data: Buffer): Promise<{ tab
   }
   if (lower.endsWith('.xlsx')) return parseXlsx(data);
   if (lower.endsWith('.xls')) throw invalid('Old .xls files are not supported. Save the file as .xlsx or CSV and try again.');
-  throw invalid('Supported files: Excel (.xlsx) and CSV');
+  throw invalid('Supported files: Excel (.xlsx), CSV and Word (.docx)');
 }

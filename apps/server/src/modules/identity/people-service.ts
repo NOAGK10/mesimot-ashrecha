@@ -1,9 +1,10 @@
 import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { PersonDto, createPersonSchema, updatePersonSchema } from '@org/shared';
+import { defaultAvatarColor } from '@org/shared';
 import type { AppContext } from '../../context';
 import type { Db } from '../../db/client';
-import { people, sessions } from '../../db/schema';
+import { people, personAvatars, sessions } from '../../db/schema';
 import { conflict, forbidden, invalid, notFound } from '../../lib/errors';
 import { recordAudit } from '../audit/audit';
 import { policy } from './policy';
@@ -11,7 +12,7 @@ import { actorOf, type Principal } from './principal';
 
 type PersonRow = typeof people.$inferSelect;
 
-function toDto(r: PersonRow, withEmail: boolean): PersonDto {
+export function toPersonDto(r: PersonRow, withEmail: boolean, avatarUpdatedAt: Date | null = null): PersonDto {
   return {
     id: r.id,
     displayName: r.displayName,
@@ -20,14 +21,23 @@ function toDto(r: PersonRow, withEmail: boolean): PersonDto {
     jobTitle: r.jobTitle,
     active: r.deactivatedAt === null,
     hasLogin: r.userId !== null,
+    avatarColor: r.avatarColor ?? defaultAvatarColor(r.id),
+    avatarVersion: avatarUpdatedAt ? avatarUpdatedAt.getTime() : null,
+    responsibilities: r.responsibilities,
   };
 }
+const toDto = toPersonDto;
 
 /** Guests see names (to know who owns what) but not e-mail addresses. */
 export async function listPeople(ctx: AppContext, p: Principal): Promise<PersonDto[]> {
   if (!policy.canListPeople(p)) throw forbidden();
-  const rows = await ctx.db.select().from(people).where(eq(people.orgId, p.orgId)).orderBy(asc(people.displayName));
-  return rows.map((r) => toDto(r, policy.canManagePeople(p)));
+  const rows = await ctx.db
+    .select({ person: people, avatarAt: personAvatars.updatedAt })
+    .from(people)
+    .leftJoin(personAvatars, eq(personAvatars.personId, people.id))
+    .where(eq(people.orgId, p.orgId))
+    .orderBy(asc(people.displayName));
+  return rows.map((r) => toDto(r.person, policy.canManagePeople(p), r.avatarAt));
 }
 
 async function assertEmailFree(db: Db, orgId: string, email: string, exceptId?: string) {

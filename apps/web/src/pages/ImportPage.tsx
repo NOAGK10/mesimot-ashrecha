@@ -3,7 +3,8 @@ import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ImportPreviewDto, ImportResultDto, PersonDto, TaskStatus } from '@org/shared';
 import { TASK_STATUSES, looksDone, parseLooseDate } from '@org/shared';
-import { api, upload, useCategories, useGoogleStatus, useMe, usePeople } from '../api';
+import { api, upload, useCategories, useGoogleStatus, useMe, usePeople, useTaskCategories } from '../api';
+import { CategorySelect } from '../components/Category';
 import { ErrorText } from '../components/common';
 import { GoogleConnect } from '../components/GoogleConnect';
 import { pickFromDrive } from '../google';
@@ -14,13 +15,14 @@ import { STATUS_LABEL, formatDate } from '../he';
  * 1. source → 2. columns → 3. people & statuses → 4. review rows → approve.
  */
 
-type Field = 'title' | 'owner' | 'due' | 'status' | 'description' | 'participants';
+type Field = 'title' | 'owner' | 'due' | 'status' | 'category' | 'description' | 'participants';
 const FIELD_LABEL: Record<Field, string> = {
   title: 'מה צריך לעשות (חובה)',
   owner: 'אחראי',
   due: 'תאריך יעד',
   status: 'בוצע / סטטוס',
   description: 'פרטים / הערות',
+  category: 'קטגוריה',
   participants: 'משתתפים',
 };
 const GUESS: Record<Field, RegExp> = {
@@ -29,6 +31,7 @@ const GUESS: Record<Field, RegExp> = {
   due: /תאריך|יעד|מועד|דד.?ליין|due|date|deadline|עד מתי/i,
   status: /בוצע|סטטוס|מצב|הושלם|status|done|✓/i,
   description: /הערות|פרטים|תיאור|notes|description|comment/i,
+  category: /קטגוריה|תחום|נושא כללי|category|סוג/i,
   participants: /משתתפים|שותפים|participants|עם מי/i,
 };
 const FIELDS = Object.keys(FIELD_LABEL) as Field[];
@@ -106,7 +109,7 @@ function SourceStep({ onPreview }: { onPreview: (p: ImportPreviewDto) => void })
 
   return (
     <section>
-      <h1>ייבוא משימות מגיליון</h1>
+      <h1>ייבוא משימות מטבלה או ממסמך</h1>
       <p className="muted">
         בוחרים טבלה קיימת, מתאימים את העמודות, בודקים את השורות ומאשרים. המשימות נוצרות רק אחרי האישור, והגיליון המקורי לא משתנה.
       </p>
@@ -114,7 +117,7 @@ function SourceStep({ onPreview }: { onPreview: (p: ImportPreviewDto) => void })
       <div className="choice-grid">
         <div className="card">
           <h2>📁 קובץ מהמחשב</h2>
-          <p className="muted small">Excel (‎.xlsx) או CSV</p>
+          <p className="muted small">Excel (‎.xlsx), CSV או Word (‎.docx)</p>
           <button disabled={busy} onClick={() => fileRef.current?.click()}>
             בחירת קובץ
           </button>
@@ -122,7 +125,7 @@ function SourceStep({ onPreview }: { onPreview: (p: ImportPreviewDto) => void })
             ref={fileRef}
             type="file"
             hidden
-            accept=".xlsx,.csv"
+            accept=".xlsx,.csv,.docx"
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
@@ -132,12 +135,12 @@ function SourceStep({ onPreview }: { onPreview: (p: ImportPreviewDto) => void })
         </div>
         <div className="card">
           <h2>📊 מ-Google Drive</h2>
-          <p className="muted small">בוחרים גיליון מתוך החשבון המחובר</p>
+          <p className="muted small">בוחרים גיליון או מסמך מתוך החשבון המחובר</p>
           <button
             disabled={busy || !connected}
             onClick={() =>
               run(async () => {
-                const id = await pickFromDrive(google.data!, 'sheets');
+                const id = await pickFromDrive(google.data!, 'sheets_docs');
                 return id ? api<ImportPreviewDto>('POST', '/api/imports/preview/google', { googleFileId: id }) : null;
               })
             }
@@ -151,9 +154,9 @@ function SourceStep({ onPreview }: { onPreview: (p: ImportPreviewDto) => void })
           )}
         </div>
         <form className="card" onSubmit={(e) => (e.preventDefault(), run(() => api<ImportPreviewDto>('POST', '/api/imports/preview/link', { url })))}>
-          <h2>🔗 קישור לגיליון</h2>
+          <h2>🔗 קישור לגיליון או למסמך</h2>
           <p className="muted small">עובד אם הגיליון משותף "לכל מי שיש לו את הקישור"</p>
-          <input type="url" dir="ltr" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/…" />
+          <input type="url" dir="ltr" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/…" />
           <button type="submit" disabled={busy}>
             קריאה
           </button>
@@ -182,11 +185,14 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
     [table, hasHeader],
   );
 
-  const [mapping, setMapping] = useState<Mapping>(() => ({ title: -1, owner: -1, due: -1, status: -1, description: -1, participants: -1 }));
+  const [mapping, setMapping] = useState<Mapping>(() => ({ title: -1, owner: -1, due: -1, status: -1, category: -1, description: -1, participants: -1 }));
   const [appendRest, setAppendRest] = useState(true);
   const [personMap, setPersonMap] = useState<Record<string, string>>({});
   const [defaultOwner, setDefaultOwner] = useState('');
   const [statusMap, setStatusMap] = useState<Record<string, TaskStatus>>({});
+  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
+  const [defaultCategory, setDefaultCategory] = useState<string | null>(null);
+  const taskCategories = useTaskCategories();
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const [categoryId, setCategoryId] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -194,7 +200,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
 
   // Guess columns from header names whenever the table changes.
   useEffect(() => {
-    const next: Mapping = { title: -1, owner: -1, due: -1, status: -1, description: -1, participants: -1 };
+    const next: Mapping = { title: -1, owner: -1, due: -1, status: -1, category: -1, description: -1, participants: -1 };
     const used = new Set<number>();
     for (const f of FIELDS) {
       const i = header.findIndex((h, idx) => !used.has(idx) && GUESS[f].test(h ?? ''));
@@ -230,6 +236,14 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
     setStatusMap((prev) => Object.fromEntries(statusValues.map((v) => [v, prev[v] ?? guessStatus(v)])));
   }, [statusValues]);
 
+  const categoryValues = useMemo(() => [...new Set(dataRows.map((r) => cell(r.cells, 'category')).filter(Boolean))].sort(), [dataRows, mapping.category]);
+  useEffect(() => {
+    if (!taskCategories.data) return;
+    const byName = new Map(taskCategories.data.map((c) => [c.name.trim().toLowerCase(), c.id]));
+    setCategoryMap((prev) => Object.fromEntries(categoryValues.map((v) => [v, prev[v] ?? byName.get(v.trim().toLowerCase()) ?? ''])));
+  }, [categoryValues, taskCategories.data]);
+  const categoryName = (id: string | null) => (id ? (taskCategories.data?.find((c) => c.id === id)?.name ?? '') : '');
+
   const personName = (id: string) => people.data?.find((p) => p.id === id)?.displayName ?? '';
   const mappedCols = new Set(Object.values(mapping).filter((i) => i >= 0));
 
@@ -259,6 +273,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
       ownerPersonId,
       dueDate,
       status: statusMap[cell(r.cells, 'status')] ?? 'new',
+      categoryId: (cell(r.cells, 'category') ? categoryMap[cell(r.cells, 'category')] : '') || defaultCategory,
       participantIds,
       warnings,
       valid: Boolean(title && ownerPersonId),
@@ -275,6 +290,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
         sourceName: preview.sourceName,
         sheetName: table.name,
         googleFileId: preview.googleFileId,
+        googleFileKind: preview.googleFileKind ?? 'google_sheet',
         categoryId: categoryId || null,
         rows: selected.map((r) => ({
           sourceRow: r.sourceRow,
@@ -284,6 +300,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
           dueDate: r.dueDate,
           status: r.status,
           participantIds: r.participantIds.filter((p) => p !== r.ownerPersonId),
+          categoryId: r.categoryId,
         })),
       });
       await qc.invalidateQueries();
@@ -381,6 +398,37 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
             </tbody>
           </table>
         )}
+        <label className="inline">
+          קטגוריה לשורות בלי קטגוריה
+          <CategorySelect value={defaultCategory} onChange={setDefaultCategory} />
+        </label>
+        {mapping.category >= 0 && categoryValues.length > 0 && (
+          <table className="task-table compact">
+            <thead>
+              <tr>
+                <th>בעמודת הקטגוריה כתוב</th>
+                <th>קטגוריה באתר</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categoryValues.map((v) => (
+                <tr key={v}>
+                  <td>{v}</td>
+                  <td>
+                    <CategorySelect
+                      value={categoryMap[v] || null}
+                      onChange={(id) => setCategoryMap({ ...categoryMap, [v]: id ?? '' })}
+                      emptyLabel="לא הותאם (לפי ברירת המחדל)"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {mapping.category >= 0 && categoryValues.some((v) => !categoryMap[v]) && (
+          <p className="muted small">קטגוריה שלא קיימת באתר אפשר להוסיף בדף "הגדרות", ואז היא תותאם לבד.</p>
+        )}
         {mapping.status >= 0 && (
           <table className="task-table compact">
             <thead>
@@ -432,6 +480,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
                 <th>אחראי</th>
                 <th>יעד</th>
                 <th>סטטוס</th>
+                <th>קטגוריה</th>
                 <th>הערות</th>
               </tr>
             </thead>
@@ -456,6 +505,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
                   <td>{personName(r.ownerPersonId) || '—'}</td>
                   <td>{formatDate(r.dueDate)}</td>
                   <td>{STATUS_LABEL[r.status]}</td>
+                  <td>{categoryName(r.categoryId) || '—'}</td>
                   <td className="small error">{r.warnings.join(' · ')}</td>
                 </tr>
               ))}
@@ -464,7 +514,7 @@ function MapAndReview({ preview, onBack, onDone }: { preview: ImportPreviewDto; 
         </div>
         {preview.googleFileId && categories.data && categories.data.length > 0 && (
           <label className="inline">
-            קטגוריה לגיליון המקור
+            תיקיית מסמכים לקובץ המקור
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">ללא</option>
               {categories.data.map((c) => (

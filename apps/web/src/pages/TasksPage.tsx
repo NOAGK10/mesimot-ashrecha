@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import type { TaskStatus, TaskView } from '@org/shared';
 import { TASK_STATUSES, TASK_VIEWS } from '@org/shared';
-import { useMe, useTasks } from '../api';
+import { useMe, useTaskCategories, useTasks } from '../api';
+import { CategoryChip } from '../components/Category';
 import { PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { STATUS_LABEL, VIEW_LABEL, formatDate } from '../he';
 
@@ -14,6 +15,7 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
   const [view, setView] = useState<TaskView>('all');
   const [owner, setOwner] = useState('');
   const [status, setStatus] = useState<TaskStatus | ''>('');
+  const [category, setCategory] = useState('');
   const [includeArchived, setIncludeArchived] = useState(false);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -23,12 +25,14 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
     return () => clearTimeout(id);
   }, [search]);
   const people = usePeopleMap();
+  const categories = useTaskCategories();
   const tasks = useTasks({
     view,
     mine: scope === 'mine',
     personId: scope === 'person' ? personId : undefined,
     ownerPersonId: owner || undefined,
     status: status || undefined,
+    categoryId: category || undefined,
     q: query || undefined,
     includeArchived,
   });
@@ -45,7 +49,7 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
           <div className="actions tight">
             {isManager && (
               <Link className="button secondary-link" to="/import">
-                ייבוא מגיליון
+                ייבוא מטבלה או ממסמך
               </Link>
             )}
             <Link className="button" to="/tasks/new">
@@ -87,6 +91,18 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
           </label>
         )}
         <label>
+          קטגוריה
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">כל הקטגוריות</option>
+            {categories.data?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+            <option value="none">בלי קטגוריה</option>
+          </select>
+        </label>
+        <label>
           סטטוס
           <select value={status} onChange={(e) => setStatus(e.target.value as TaskStatus | '')}>
             <option value="">{view === 'all' ? 'כל הסטטוסים' : 'פתוחות'}</option>
@@ -122,11 +138,12 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
               <tr key={t.id} className={t.archivedAt ? 'archived' : ''}>
                 <td data-label="משימה">
                   <Link to={`/tasks/${t.id}`}>{t.title}</Link>
+                  <CategoryChip categoryId={t.categoryId} />
                   {t.recurrenceDefinitionId && <span className="tag" title="משימה חוזרת">↻</span>}
                   {t.archivedAt && <span className="tag">ארכיון</span>}
                 </td>
                 <td data-label="אחראי">
-                  <PersonTag id={t.ownerPersonId} name={people.name(t.ownerPersonId)} jobTitle={people.jobTitle(t.ownerPersonId)} />
+                  <PersonTag id={t.ownerPersonId} avatarFor={t.ownerPersonId} name={people.name(t.ownerPersonId)} jobTitle={people.jobTitle(t.ownerPersonId)} />
                 </td>
                 <td data-label="יעד" className={t.isOverdue ? 'overdue' : ''}>
                   {formatDate(t.dueDate)}

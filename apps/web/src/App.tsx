@@ -13,7 +13,11 @@ import { DevOutboxPage } from './pages/DevOutboxPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { ImportPage } from './pages/ImportPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { PersonPage, TeamPage } from './pages/TeamPage';
+import { ChatPage } from './pages/ChatPage';
+import { HomePage, useInbox } from './pages/HomePage';
+import { Avatar } from './components/Avatar';
+import { TeamPage } from './pages/TeamPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 export function App() {
   const me = useMe();
@@ -55,21 +59,26 @@ export function App() {
       <header className="topbar">
         <span className="brand">{me.data.organization.name}</span>
         <nav className="nav">
+          <NavLink to="/home">בית</NavLink>
           <NavLink to="/my">המשימות שלי</NavLink>
           {seesAll && <NavLink to="/all">כל המשימות</NavLink>}
           {seesAll && <NavLink to="/team">צוות</NavLink>}
           {isManager && <NavLink to="/recurring">משימות חוזרות</NavLink>}
           {isManager && <NavLink to="/documents">מסמכים</NavLink>}
+          <NavLink to="/chat">צ'אט</NavLink>
         </nav>
-        <UserMenu name={me.data.displayName} isManager={isManager} />
+        <Bell />
+        <UserMenu name={me.data.displayName} personId={me.data.personId} isManager={isManager} />
       </header>
       <main className="content">
         <Routes>
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/people/:id" element={<ProfilePage />} />
           <Route path="/my" element={<TasksPage scope="mine" />} />
           {seesAll && <Route path="/all" element={<TasksPage scope="all" />} />}
           {seesAll && <Route path="/tasks/new" element={<NewTaskPage />} />}
           {seesAll && <Route path="/team" element={<TeamPage />} />}
-          {seesAll && <Route path="/people/:id" element={<PersonPage />} />}
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           {isManager && <Route path="/recurring" element={<RecurrencesPage />} />}
           {isManager && <Route path="/documents" element={<DocumentsPage />} />}
@@ -77,15 +86,26 @@ export function App() {
           {isManager && <Route path="/people" element={<PeoplePage />} />}
           {isManager && <Route path="/ops" element={<OpsPage />} />}
           {isManager && <Route path="/settings" element={<SettingsPage />} />}
-          <Route path="*" element={<Navigate to="/my" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>
     </div>
   );
 }
 
+/** Unread notifications; opens the home page where they are listed. */
+function Bell() {
+  const inbox = useInbox();
+  const unread = inbox.data?.unread ?? 0;
+  return (
+    <Link to="/home" className="bell" aria-label={unread ? `${unread} התראות חדשות` : 'התראות'} title="התראות">
+      🔔{unread > 0 && <span className="bell-count">{unread > 99 ? '99+' : unread}</span>}
+    </Link>
+  );
+}
+
 /** Name menu. Managers find the technical status screen here; a red dot appears only when something is wrong. */
-function UserMenu({ name, isManager }: { name: string; isManager: boolean }) {
+function UserMenu({ name, personId, isManager }: { name: string; personId: string; isManager: boolean }) {
   const qc = useQueryClient();
   const ops = useQuery({
     queryKey: ['ops'],
@@ -102,10 +122,14 @@ function UserMenu({ name, isManager }: { name: string; isManager: boolean }) {
   return (
     <details className="user-menu">
       <summary>
+        <Avatar personId={personId} name={name} size={26} />
         {name}
         {problem && <span className="alert-dot" title="יש תקלה במערכת" />} ▾
       </summary>
       <div className="menu">
+        <Link to={`/people/${personId}`} onClick={(e) => e.currentTarget.closest('details')?.removeAttribute('open')}>
+          הפרופיל שלי
+        </Link>
         {isManager && (
           <Link to="/settings" onClick={(e) => e.currentTarget.closest('details')?.removeAttribute('open')}>
             הגדרות

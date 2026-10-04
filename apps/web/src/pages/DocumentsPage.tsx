@@ -32,7 +32,7 @@ export function DocumentsPage() {
       <div className="page-head">
         <h1>מסמכים</h1>
         <Link className="button secondary-link" to="/import">
-          ייבוא משימות מגיליון
+          ייבוא משימות מטבלה או ממסמך
         </Link>
       </div>
       <p className="muted small">המסמכים עצמם נשארים ב-Google. כאן מסדרים אותם לפי קטגוריות ומקשרים אותם למשימות.</p>

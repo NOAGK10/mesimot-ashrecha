@@ -42,6 +42,7 @@ export const createTaskSchema = z.object({
   ownerPersonId: uuid,
   dueDate: isoDate.nullable().default(null),
   participantIds: z.array(uuid).max(100).default([]),
+  categoryId: uuid.nullable().optional(),
 });
 export const updateTaskSchema = z.object({
   version: z.number().int().positive(),
@@ -49,6 +50,7 @@ export const updateTaskSchema = z.object({
   description: z.string().max(20_000).optional(),
   ownerPersonId: uuid.optional(),
   dueDate: isoDate.nullable().optional(),
+  categoryId: uuid.nullable().optional(),
 });
 export const changeStatusSchema = z.object({
   version: z.number().int().positive(),
@@ -70,6 +72,8 @@ export const listTasksQuerySchema = z.object({
   personId: uuid.optional(),
   /** Free-text search in title and description. */
   q: z.string().trim().max(100).optional(),
+  /** A category id, or "none" for tasks without a category. */
+  categoryId: z.union([uuid, z.literal('none')]).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   includeArchived: z.coerce.boolean().default(false),
 });
@@ -88,6 +92,7 @@ export const createRecurrenceSchema = z.object({
   description: z.string().max(20_000).default(''),
   ownerPersonId: uuid,
   participantIds: z.array(uuid).max(100).default([]),
+  categoryId: uuid.nullable().optional(),
   mode: z.enum(RECURRENCE_MODES),
   startDate: isoDate,
   endDate: isoDate.nullable().default(null),
@@ -99,6 +104,7 @@ export const updateRecurrenceSchema = z.object({
   description: z.string().max(20_000).optional(),
   ownerPersonId: uuid.optional(),
   participantIds: z.array(uuid).max(100).optional(),
+  categoryId: uuid.nullable().optional(),
   endDate: isoDate.nullable().optional(),
 });
 
@@ -148,6 +154,7 @@ export interface SourceTable {
 export interface ImportPreviewDto {
   sourceName: string;
   googleFileId: string | null;
+  googleFileKind: 'google_sheet' | 'google_doc' | null;
   tables: SourceTable[];
   truncated: boolean;
 }
@@ -163,11 +170,14 @@ export const importRowSchema = z.object({
   dueDate: isoDate.nullable().default(null),
   status: z.enum(TASK_STATUSES).default('new'),
   participantIds: z.array(uuid).max(100).default([]),
+  categoryId: uuid.nullable().optional(),
 });
 export const commitImportSchema = z.object({
   sourceName: z.string().trim().min(1).max(300),
   sheetName: z.string().max(300).default(''),
   googleFileId: z.string().min(10).max(200).nullable().default(null),
+  /** Kind of the Google source file, recorded as the import's source document. */
+  googleFileKind: z.enum(['google_sheet', 'google_doc']).default('google_sheet'),
   categoryId: uuid.nullable().default(null),
   rows: z.array(importRowSchema).min(1).max(2000),
 });
@@ -211,6 +221,106 @@ export interface GoogleStatusDto {
 }
 export const googleConnectSchema = z.object({ code: z.string().min(10) });
 
+// ---- Chat & inbox ----
+/** A message in the general chat (taskId null) or in a task's chat. */
+export const postMessageSchema = z.object({
+  body: z.string().trim().min(1).max(4000),
+  taskId: uuid.nullable().default(null),
+  /** People tagged with @ in this message; each gets an inbox notification. */
+  mentionIds: z.array(uuid).max(50).default([]),
+});
+export const listMessagesQuerySchema = z.object({
+  taskId: uuid.optional(),
+  /** Only messages newer than this id (polling). */
+  after: z.coerce.number().int().min(0).optional(),
+  /** Only messages older than this id (loading history). */
+  before: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export interface MessageDto {
+  id: number;
+  taskId: string | null;
+  authorPersonId: string;
+  body: string;
+  mentionIds: string[];
+  createdAt: string;
+  deleted: boolean;
+  canDelete: boolean;
+}
+
+export const INBOX_KINDS = ['mention', 'task_assigned', 'feedback'] as const;
+export type InboxKind = (typeof INBOX_KINDS)[number];
+export interface InboxItemDto {
+  id: number;
+  kind: InboxKind;
+  actorPersonId: string | null;
+  taskId: string | null;
+  taskTitle: string | null;
+  taskDueDate: string | null;
+  messageId: number | null;
+  /** Start of the message that mentioned the person. */
+  excerpt: string | null;
+  createdAt: string;
+  read: boolean;
+}
+export const markReadSchema = z.union([z.object({ ids: z.array(z.number().int()).min(1).max(200) }), z.object({ all: z.literal(true) })]);
+
+// ---- Profiles, score, feedback ----
+export const AVATAR_COLORS = ['#2456c9', '#0f8a6a', '#b4531d', '#8a3fb8', '#c2185b', '#00838f', '#6d7a12', '#a33a3a', '#3f51b5', '#5d6b7a'] as const;
+/** Stable default colour per person, so everyone looks different before choosing one. */
+export function defaultAvatarColor(id: string): string {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
+}
+export const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'expected #RRGGBB');
+
+/** Fields a person may edit on their own profile (managers may edit anyone's). */
+export const taskCategorySchema = z.object({ name: z.string().trim().min(1).max(60), color: hexColor });
+export interface TaskCategoryDto {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export const updateProfileSchema = z.object({
+  avatarColor: hexColor.nullable().optional(),
+  /** What this person is responsible for in the organisation, in their own words. */
+  responsibilities: z.string().trim().max(2000).nullable().optional(),
+});
+/** A square image, already resized in the browser, as a data URL. */
+export const uploadAvatarSchema = z.object({ dataUrl: z.string().max(500_000) });
+
+export const postFeedbackSchema = z.object({ body: z.string().trim().min(1).max(2000) });
+
+export interface FeedbackDto {
+  id: number;
+  authorPersonId: string;
+  body: string;
+  createdAt: string;
+  canDelete: boolean;
+}
+/**
+ * Automatic score: share of the person's tasks finished by their due date over the last `windowDays`,
+ * counting open tasks that are already overdue as late. Null until there are `minSample` tasks.
+ */
+export interface PerformanceScoreDto {
+  value: number | null;
+  completedOnTime: number;
+  completedLate: number;
+  openOverdue: number;
+  completedWithoutDueDate: number;
+  windowDays: number;
+  minSample: number;
+}
+export interface ProfileDto {
+  person: PersonDto;
+  score: PerformanceScoreDto;
+  feedback: FeedbackDto[];
+  canEditProfile: boolean;
+  canGiveFeedback: boolean;
+}
+
 // ---- Organisation settings ----
 export const updateOrganizationSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
@@ -240,6 +350,11 @@ export interface PersonDto {
   jobTitle: string | null;
   active: boolean;
   hasLogin: boolean;
+  /** Profile colour (#RRGGBB); a default from AVATAR_COLORS when not chosen. */
+  avatarColor: string;
+  /** Cache-busting version of the uploaded photo, or null when there is none. */
+  avatarVersion: number | null;
+  responsibilities: string | null;
 }
 export interface TaskDto {
   id: string;
@@ -248,6 +363,7 @@ export interface TaskDto {
   status: TaskStatus;
   ownerPersonId: string;
   dueDate: string | null;
+  categoryId: string | null;
   recurrenceDefinitionId: string | null;
   occurrenceDate: string | null;
   participantIds: string[];
@@ -281,6 +397,7 @@ export interface RecurrenceDto {
   description: string;
   ownerPersonId: string;
   participantIds: string[];
+  categoryId: string | null;
   mode: (typeof RECURRENCE_MODES)[number];
   freq: (typeof RECURRENCE_FREQS)[number];
   interval: number;

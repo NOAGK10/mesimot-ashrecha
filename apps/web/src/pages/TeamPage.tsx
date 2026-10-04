@@ -1,7 +1,7 @@
-import { Link, useParams } from 'react-router';
+import { Link } from 'react-router';
 import { OPEN_STATUSES } from '@org/shared';
 import { useMe, usePeople, useTasks } from '../api';
-import { TasksPage } from './TasksPage';
+import { Avatar } from '../components/Avatar';
 
 /** Everyone in the organisation with their tag and workload; each card opens the person's page. */
 export function TeamPage() {
@@ -30,6 +30,7 @@ export function TeamPage() {
           const c = count(p.id);
           return (
             <Link key={p.id} to={`/people/${p.id}`} className="card team-card">
+              <Avatar personId={p.id} name={p.displayName} size={48} />
               <strong>{p.displayName}</strong>
               {p.jobTitle ? <span className="job-tag">{p.jobTitle}</span> : <span className="muted small">בלי תגית</span>}
               <span className="small muted">
@@ -42,9 +43,4 @@ export function TeamPage() {
       </div>
     </section>
   );
-}
-
-export function PersonPage() {
-  const { id = '' } = useParams();
-  return <TasksPage key={id} scope="person" personId={id} />;
 }

@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client';
 import { notifications, organizations } from '../../db/schema';
 import type { IsoDate } from '../../lib/dates';
+import { addInboxItems } from '../inbox/inbox-service';
 import { planDateReminders } from './plan';
 
 /**
@@ -51,6 +52,11 @@ export async function notifyAssigned(
 ): Promise<void> {
   const recipients = [...new Set(personIds)].filter((id) => id !== actorPersonId);
   if (recipients.length === 0) return;
+  // Also shown on the home page of people who sign in.
+  await addInboxItems(
+    tx,
+    recipients.map((personId) => ({ orgId: task.orgId, personId, kind: 'task_assigned' as const, actorPersonId, taskId: task.id, createdAt: now })),
+  );
   await tx
     .insert(notifications)
     .values(recipients.map((personId) => ({ orgId: task.orgId, taskId: task.id, personId, kind: 'assigned' as const, sendAt: now })))
