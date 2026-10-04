@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import type { TaskStatus, TaskView } from '@org/shared';
+import type { TaskDto, TaskStatus, TaskView } from '@org/shared';
 import { TASK_STATUSES, TASK_VIEWS } from '@org/shared';
-import { useMe, useTaskCategories, useTasks } from '../api';
+import { api, useApiMutation, useMe, useTaskCategories, useTasks } from '../api';
 import { CategoryChip } from '../components/Category';
 import { PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { STATUS_LABEL, VIEW_LABEL, formatDate } from '../he';
@@ -39,6 +39,11 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
     q: query || undefined,
     includeArchived,
   });
+  const remove = useApiMutation((t: TaskDto) => api('POST', `/api/tasks/${t.id}/delete`, { version: t.version }));
+  const canDelete = (t: TaskDto) => isManager || t.createdByPersonId === me.data?.personId;
+  const askRemove = (t: TaskDto) => {
+    if (confirm(`למחוק את המשימה "${t.title}"? היא תיעלם לכולם.`)) remove.mutate(t);
+  };
   const activeFilters = [owner, status, category, includeArchived ? 'x' : ''].filter(Boolean).length;
   const clearFilters = () => (setOwner(''), setStatus(''), setCategory(''), setIncludeArchived(false));
 
@@ -119,6 +124,7 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
         ))}
       </div>
 
+      {remove.error ? <p className="error">המחיקה לא הצליחה. אולי מישהו שינה את המשימה בינתיים – כדאי לרענן ולנסות שוב.</p> : null}
       {tasks.isLoading && <p className="muted">טוען…</p>}
       {tasks.data?.length === 0 && <p className="empty">{query ? `לא נמצאו משימות עם "${query}".` : 'אין כאן משימות.'}</p>}
       {tasks.data && tasks.data.length > 0 && (
@@ -144,6 +150,11 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
               </Link>
               <span className="task-card-owner">
                 <PersonTag avatarFor={t.ownerPersonId} name={people.name(t.ownerPersonId)} />
+                {canDelete(t) && (
+                  <button className="remove-x trash" onClick={() => askRemove(t)} disabled={remove.isPending} title="מחיקת המשימה" aria-label={`מחיקת המשימה ${t.title}`}>
+                    🗑
+                  </button>
+                )}
               </span>
             </li>
           ))}
