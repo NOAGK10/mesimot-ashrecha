@@ -26,7 +26,8 @@ describe('task lifecycle', () => {
 });
 
 describe('authorization policy', () => {
-  const task: TaskFacts = { id: 't1', orgId: 'o1', ownerPersonId: 'owner', participantIds: ['part'] };
+  const task: TaskFacts = { id: 't1', orgId: 'o1', ownerPersonId: 'owner', participantIds: ['part'], visibility: 'private', createdByPersonId: 'creator' };
+  const orgTask: TaskFacts = { ...task, visibility: 'org' };
   const p = (personId: string, access: Principal['access'], scopeTaskId: string | null = null, orgId = 'o1'): Principal => ({
     personId,
     orgId,
@@ -40,11 +41,24 @@ describe('authorization policy', () => {
     expect(policy.canEditTask(p('m', 'manager'), task)).toBe(true);
     expect(policy.canViewTask(p('m', 'manager', null, 'other'), task)).toBe(false);
   });
-  it('guests see and update status only for tasks they are involved in', () => {
+  it('private tasks are seen only by the people on them, their creator and managers', () => {
     expect(policy.canViewTask(p('part', 'guest'), task)).toBe(true);
+    expect(policy.canViewTask(p('creator', 'member'), task)).toBe(true);
+    expect(policy.canViewTask(p('stranger', 'member'), task)).toBe(false);
+    expect(policy.canViewTask(p('stranger', 'guest'), task)).toBe(false);
+    expect(policy.canViewTask(p('boss', 'manager'), task)).toBe(true);
+  });
+  it('organisation tasks are seen by everyone who signs in', () => {
+    expect(policy.canViewTask(p('stranger', 'guest'), orgTask)).toBe(true);
+    expect(policy.canViewTask(p('stranger', 'member'), orgTask)).toBe(true);
+    expect(policy.canChangeStatus(p('stranger', 'member'), orgTask)).toBe(false);
+  });
+  it('the creator and managers edit and delete; participants only change status', () => {
     expect(policy.canChangeStatus(p('part', 'guest'), task)).toBe(true);
     expect(policy.canEditTask(p('part', 'guest'), task)).toBe(false);
-    expect(policy.canViewTask(p('stranger', 'guest'), task)).toBe(false);
+    expect(policy.canEditTask(p('creator', 'member'), task)).toBe(true);
+    expect(policy.canDeleteTask(p('creator', 'member'), task)).toBe(true);
+    expect(policy.canDeleteTask(p('owner', 'member'), task)).toBe(false);
     expect(policy.canCreateTask(p('part', 'guest'))).toBe(false);
   });
   it('magic-link sessions are confined to one task', () => {

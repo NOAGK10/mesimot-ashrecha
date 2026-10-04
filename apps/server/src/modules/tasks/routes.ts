@@ -13,6 +13,7 @@ import type { AppContext } from '../../context';
 import { requirePrincipal } from '../../http';
 import { parse } from '../../lib/validate';
 import { createTaskCategory, deleteTaskCategory, listTaskCategories, updateTaskCategory } from './category-service';
+import { deleteTask } from './task-service';
 import { changeStatus, createTask, getTaskDetail, listTasks, setArchived, setParticipants, updateTask } from './task-service';
 
 const idParam = z.object({ id: z.uuid() });
@@ -54,6 +55,10 @@ export function taskRoutes(app: FastifyInstance, ctx: AppContext): void {
     setParticipants(ctx, requirePrincipal(req), parse(idParam, req.params).id, parse(setParticipantsSchema, req.body)),
   );
 
+  app.post('/api/tasks/:id/delete', async (req) => {
+    await deleteTask(ctx, requirePrincipal(req), parse(idParam, req.params).id, parse(versionOnlySchema, req.body).version);
+    return { ok: true };
+  });
   app.post('/api/tasks/:id/archive', async (req) =>
     setArchived(ctx, requirePrincipal(req), parse(idParam, req.params).id, parse(versionOnlySchema, req.body).version, true),
   );

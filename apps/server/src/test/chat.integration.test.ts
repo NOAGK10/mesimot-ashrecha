@@ -65,7 +65,7 @@ describe('general chat', () => {
 
 describe('task chat', () => {
   it('follows the task\'s visibility, and guests can be tagged only if they are on the task', async () => {
-    const t = await createTask(h.ctx, h.manager, { title: 'Chat task', description: '', ownerPersonId: h.member.personId, dueDate: null, participantIds: [] });
+    const t = await createTask(h.ctx, h.manager, { title: 'Chat task', description: '', ownerPersonId: h.member.personId, dueDate: null, participantIds: [], visibility: 'private' });
     await postMessage(h.ctx, h.member, { taskId: t.id, mentionIds: [], body: 'התחלתי' });
     expect((await list(h.manager, { taskId: t.id })).map((m) => m.body)).toEqual(['התחלתי']);
     expect((await list()).some((m) => m.body === 'התחלתי')).toBe(false);
@@ -78,6 +78,14 @@ describe('task chat', () => {
     await postMessage(h.ctx, h.manager, { taskId: t.id, mentionIds: [h.guest.personId], body: '@Guest מה המצב?' });
     const item = (await listInbox(h.ctx, h.guest)).find((i) => i.kind === 'mention');
     expect(item).toMatchObject({ taskId: t.id, taskTitle: 'Chat task' });
+  });
+});
+
+describe('organisation task chat', () => {
+  it('is open to everyone who signs in, so guests can read it and be tagged', async () => {
+    const t = await createTask(h.ctx, h.manager, { title: 'Org chat task', description: '', ownerPersonId: h.member.personId, dueDate: null, participantIds: [] });
+    await postMessage(h.ctx, h.manager, { taskId: t.id, mentionIds: [h.guest.personId], body: 'גם לך' });
+    expect((await list(h.guest, { taskId: t.id })).map((m) => m.body)).toEqual(['גם לך']);
   });
 });
 

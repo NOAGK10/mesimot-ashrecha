@@ -35,7 +35,7 @@ async function today(db: Db, orgId: string, now: Date) {
 /** Loads and row-locks a task, then checks organisation, visibility and optimistic version. */
 async function lockTask(tx: Db, p: Principal, id: string, version: number): Promise<TaskWithParticipants> {
   const task = await loadTask(tx, id, true);
-  if (!task || !policy.canViewTask(p, task)) throw notFound('Task');
+  if (!task || task.deletedAt || !policy.canViewTask(p, task)) throw notFound('Task');
   if (task.version !== version) throw staleVersion();
   return task;
 }
@@ -61,14 +61,14 @@ export async function createTask(ctx: AppContext, p: Principal, input: z.output<
   return ctx.db.transaction(async (tx) => {
     await assertActivePeople(tx, p.orgId, [input.ownerPersonId, ...input.participantIds]);
     await assertTaskCategory(tx, p.orgId, input.categoryId);
-    const task = (await insertTask(tx, { ...input, orgId: p.orgId, createdByPersonId: p.personId }, now))!;
+    const task = (await insertTask(tx, { ...input, visibility: input.visibility ?? 'org', orgId: p.orgId, createdByPersonId: p.personId }, now))!;
     await recordAudit(tx, {
       orgId: p.orgId,
       entityType: 'task',
       entityId: task.id,
       type: 'task.created',
       actor: actorOf(p),
-      data: { title: task.title, ownerPersonId: task.ownerPersonId, dueDate: task.dueDate, participantIds: task.participantIds, categoryId: task.categoryId },
+      data: { title: task.title, ownerPersonId: task.ownerPersonId, dueDate: task.dueDate, participantIds: task.participantIds, categoryId: task.categoryId, visibility: task.visibility },
     });
     await notifyAssigned(tx, task, [task.ownerPersonId, ...task.participantIds], p.personId, now);
     await replanReminders(tx, reminderTarget(task), now);
@@ -92,6 +92,10 @@ export async function updateTask(ctx: AppContext, p: Principal, id: string, inpu
     if (input.description !== undefined && input.description !== task.description) (patch.description = input.description), (details.description = true);
     if (Object.keys(details).length) await audit('task.updated', details);
 
+    if (input.visibility !== undefined && input.visibility !== task.visibility) {
+      patch.visibility = input.visibility;
+      await audit('task.visibility_changed', { from: task.visibility, to: input.visibility });
+    }
     if (input.categoryId !== undefined && input.categoryId !== task.categoryId) {
       await assertTaskCategory(tx, p.orgId, input.categoryId);
       patch.categoryId = input.categoryId;
@@ -102,6 +106,8 @@ export async function updateTask(ctx: AppContext, p: Principal, id: string, inpu
       await audit('task.due_date_changed', { from: task.dueDate, to: input.dueDate });
     }
     if (input.ownerPersonId !== undefined && input.ownerPersonId !== task.ownerPersonId) {
+      // A member editing their own task cannot hand it to someone else.
+      if (!policy.canCreateTaskOwnedBy(p, input.ownerPersonId)) throw forbidden('Only managers can assign a task to someone else');
       await assertActivePeople(tx, p.orgId, [input.ownerPersonId]);
       patch.ownerPersonId = input.ownerPersonId;
       await audit('task.owner_changed', { from: task.ownerPersonId, to: input.ownerPersonId });
@@ -176,6 +182,21 @@ export async function setArchived(ctx: AppContext, p: Principal, id: string, ver
   });
 }
 
+/**
+ * Deletes a task for everyone (its creator or a manager). It disappears from every list; the row and
+ * its audit trail remain so the deletion itself stays traceable (architecture rule 9).
+ */
+export async function deleteTask(ctx: AppContext, p: Principal, id: string, version: number): Promise<void> {
+  const now = ctx.now();
+  await ctx.db.transaction(async (tx) => {
+    const task = await lockTask(tx, p, id, version);
+    if (!policy.canDeleteTask(p, task)) throw forbidden();
+    await bump(tx, id, { deletedAt: now }, now);
+    await cancelPendingReminders(tx, id);
+    await recordAudit(tx, { orgId: p.orgId, entityType: 'task', entityId: id, type: 'task.deleted', actor: actorOf(p), data: { title: task.title } });
+  });
+}
+
 // ---------------- Queries ----------------
 
 export async function listTasks(ctx: AppContext, p: Principal, q: z.output<typeof listTasksQuerySchema>): Promise<TaskDto[]> {
@@ -195,9 +216,12 @@ export async function listTasks(ctx: AppContext, p: Principal, q: z.output<typeo
       ),
     )!;
 
-  const where: SQL[] = [eq(tasks.orgId, p.orgId)];
+  const mine = or(involves(p.personId), eq(tasks.createdByPersonId, p.personId))!;
+  const where: SQL[] = [eq(tasks.orgId, p.orgId), isNull(tasks.deletedAt)];
   if (!q.includeArchived) where.push(isNull(tasks.archivedAt));
-  if (q.mine || !policy.canListOrgTasks(p)) where.push(involves(p.personId));
+  // Private tasks are visible only to the people on them, their creator and managers.
+  if (!policy.canListAllTasks(p)) where.push(or(eq(tasks.visibility, 'org'), mine)!);
+  if (q.mine) where.push(mine);
   if (q.personId) where.push(involves(q.personId));
   if (q.q) {
     // Escape LIKE wildcards so "50%" searches for the text, not a pattern.
@@ -241,7 +265,7 @@ export async function listTasks(ctx: AppContext, p: Principal, q: z.output<typeo
 
 export async function getTaskDetail(ctx: AppContext, p: Principal, id: string): Promise<TaskDetailDto> {
   const task = await loadTask(ctx.db, id);
-  if (!task || !policy.canViewTask(p, task)) throw notFound('Task');
+  if (!task || task.deletedAt || !policy.canViewTask(p, task)) throw notFound('Task');
   const dto = toTaskDto(task, await today(ctx.db, p.orgId, ctx.now()));
   const events = await listAudit(ctx.db, 'task', id);
   const ids = [task.ownerPersonId, ...task.participantIds, ...events.flatMap((e) => (e.actorPersonId ? [e.actorPersonId] : []))];
@@ -254,6 +278,7 @@ export async function getTaskDetail(ctx: AppContext, p: Principal, id: string): 
     ...dto,
     allowedStatuses: policy.canChangeStatus(p, task) ? allowedTransitions(task.status, task.archivedAt !== null) : [],
     canEdit: policy.canEditTask(p, task),
+    canDelete: policy.canDeleteTask(p, task),
     events,
     names: Object.fromEntries(named.map((n) => [n.id, n.displayName])),
     jobTitles: Object.fromEntries(named.flatMap((n) => (n.jobTitle ? [[n.id, n.jobTitle]] : []))),

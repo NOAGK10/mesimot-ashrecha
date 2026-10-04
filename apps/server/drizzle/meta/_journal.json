@@ -57,6 +57,13 @@
       "when": 1791133785218,
       "tag": "0007_email_for_tags_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791136772538,
+      "tag": "0008_visibility_and_deletion",
+      "breakpoints": true
     }
   ]
 }

@@ -58,6 +58,7 @@ export interface NewTask {
   /** Initial status; only imports start anywhere other than 'new'. */
   status?: TaskStatus;
   categoryId?: string | null;
+  visibility?: 'org' | 'private';
 }
 
 /**
@@ -75,6 +76,7 @@ export async function insertTask(tx: Db, t: NewTask, now: Date): Promise<TaskWit
       ownerPersonId: t.ownerPersonId,
       dueDate: t.dueDate,
       categoryId: t.categoryId ?? null,
+      visibility: t.visibility ?? 'org',
       createdByPersonId: t.createdByPersonId,
       recurrenceDefinitionId: t.recurrence?.definitionId ?? null,
       occurrenceDate: t.recurrence?.occurrenceDate ?? null,
@@ -101,6 +103,8 @@ export function toTaskDto(t: TaskWithParticipants, today: IsoDate): TaskDto {
     ownerPersonId: t.ownerPersonId,
     dueDate: t.dueDate,
     categoryId: t.categoryId,
+    visibility: t.visibility,
+    createdByPersonId: t.createdByPersonId,
     recurrenceDefinitionId: t.recurrenceDefinitionId,
     occurrenceDate: t.occurrenceDate,
     participantIds: t.participantIds,

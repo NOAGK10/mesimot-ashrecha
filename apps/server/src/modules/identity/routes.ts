@@ -15,7 +15,7 @@ import {
   redeemMagicLink,
 } from './auth-service';
 import { getOrganizationSettings, updateOrganizationSettings } from './org';
-import { createPerson, listPeople, updatePerson } from './people-service';
+import { createPerson, deletePerson, listPeople, updatePerson } from './people-service';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -72,6 +72,10 @@ export function identityRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post('/api/people', async (req, reply) => {
     const person = await createPerson(ctx, requirePrincipal(req), parse(createPersonSchema, req.body));
     return reply.code(201).send(person);
+  });
+  app.post('/api/people/:id/delete', async (req) => {
+    await deletePerson(ctx, requirePrincipal(req), parse(idParam, req.params).id);
+    return { ok: true };
   });
   app.patch('/api/people/:id', async (req) => {
     const { id } = parse(idParam, req.params);

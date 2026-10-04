@@ -73,7 +73,7 @@ async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMe
   const task = await loadTask(ctx.db, n.taskId);
   const [person] = await ctx.db.select().from(people).where(eq(people.id, n.personId));
   if (!task || !person || person.deactivatedAt) return null;
-  if (task.archivedAt || (n.kind !== 'assigned' && !isOpen(task.status))) return null;
+  if (task.archivedAt || task.deletedAt || (n.kind !== 'assigned' && !isOpen(task.status))) return null;
   if (task.ownerPersonId !== person.id && !task.participantIds.includes(person.id)) return null;
 
   const org = await getOrg(ctx.db, task.orgId);
@@ -111,7 +111,7 @@ async function buildSocialMessage(ctx: AppContext, n: NotificationRow): Promise<
     const [m] = await ctx.db.select().from(chatMessages).where(eq(chatMessages.id, n.messageId));
     if (!m || m.deletedAt) return null;
     const task = m.taskId ? await loadTask(ctx.db, m.taskId) : null;
-    if (m.taskId && (!task || task.archivedAt)) return null;
+    if (m.taskId && (!task || task.archivedAt || task.deletedAt)) return null;
     const [author] = await ctx.db.select({ name: people.displayName }).from(people).where(eq(people.id, m.authorPersonId));
     return buildSocialEmail({
       kind: 'mention',

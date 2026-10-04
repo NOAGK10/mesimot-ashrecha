@@ -23,7 +23,7 @@ async function openChannel(db: Db, p: Principal, taskId: string | null | undefin
   if (p.access === 'link') throw forbidden('Chat is available to signed-in users');
   if (!taskId) return null;
   const task = await loadTask(db, taskId);
-  if (!task || !policy.canViewTask(p, task)) throw notFound('Task');
+  if (!task || task.deletedAt || !policy.canViewTask(p, task)) throw notFound('Task');
   return task;
 }
 
@@ -74,10 +74,10 @@ async function assertMentionable(db: Db, p: Principal, task: TaskWithParticipant
     .from(people)
     .where(and(eq(people.orgId, p.orgId), inArray(people.id, mentionIds), isNull(people.deactivatedAt), sql`${people.role} is not null`));
   if (found.length !== mentionIds.length) throw invalid('Only people who sign in to the site can be tagged');
-  if (task) {
-    const involved = new Set([task.ownerPersonId, ...task.participantIds]);
-    const outsider = found.find((f) => f.role === 'guest' && !involved.has(f.id));
-    if (outsider) throw invalid('A tagged guest cannot see this task');
+  if (task && task.visibility === 'private') {
+    const insiders = new Set([task.ownerPersonId, ...task.participantIds, task.createdByPersonId]);
+    const outsider = found.find((f) => f.role !== 'manager' && !insiders.has(f.id));
+    if (outsider) throw invalid('A tagged person cannot see this private task');
   }
 }
 

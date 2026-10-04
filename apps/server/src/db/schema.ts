@@ -24,12 +24,14 @@ import {
   RECURRENCE_MODES,
   RECURRENCE_STATES,
   TASK_STATUSES,
+  TASK_VISIBILITIES,
 } from '@org/shared';
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 const createdAt = () => ts('created_at').notNull().defaultNow();
 
 export const taskStatus = pgEnum('task_status', TASK_STATUSES);
+export const taskVisibility = pgEnum('task_visibility', TASK_VISIBILITIES);
 export const personRole = pgEnum('person_role', PERSON_ROLES);
 export const recurrenceMode = pgEnum('recurrence_mode', RECURRENCE_MODES);
 export const recurrenceFreq = pgEnum('recurrence_freq', RECURRENCE_FREQS);
@@ -79,6 +81,8 @@ export const people = pgTable(
     avatarColor: text('avatar_color'),
     responsibilities: text('responsibilities'),
     deactivatedAt: ts('deactivated_at'),
+    /** Removed from the organisation: hidden everywhere; kept only so history still shows the name. */
+    deletedAt: ts('deleted_at'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -187,6 +191,9 @@ export const tasks = pgTable(
     updatedAt: ts('updated_at').notNull().defaultNow(),
     completedAt: ts('completed_at'),
     archivedAt: ts('archived_at'),
+    visibility: taskVisibility('visibility').notNull().default('org'),
+    /** Deleted by its creator or a manager: hidden everywhere; the audit log keeps who and when. */
+    deletedAt: ts('deleted_at'),
     version: integer('version').notNull().default(1),
   },
   (t) => [

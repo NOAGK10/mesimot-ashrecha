@@ -1,4 +1,4 @@
-import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router';
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, useMe } from './api';
@@ -16,7 +16,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage, useInbox } from './pages/HomePage';
 import { Avatar } from './components/Avatar';
-import { TeamPage } from './pages/TeamPage';
+import { BoardPage } from './pages/BoardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PrivacyPage, TermsPage } from './pages/LegalPages';
 
@@ -56,20 +56,18 @@ export function App() {
   }
 
   const isManager = me.data.access === 'manager';
-  // Managers and permanent members see the whole organisation; guests see only their own tasks.
-  const seesAll = isManager || me.data.access === 'member';
+  const canCreate = isManager || me.data.access === 'member';
   return (
     <div className="shell">
       <header className="topbar">
         <span className="brand">{me.data.organization.name}</span>
+        {/* Kept short on purpose: the four things people use every day, everything else under "עוד". */}
         <nav className="nav">
           <NavLink to="/home">בית</NavLink>
-          <NavLink to="/my">המשימות שלי</NavLink>
-          {seesAll && <NavLink to="/all">כל המשימות</NavLink>}
-          {seesAll && <NavLink to="/team">צוות</NavLink>}
-          {isManager && <NavLink to="/recurring">משימות חוזרות</NavLink>}
-          {isManager && <NavLink to="/documents">מסמכים</NavLink>}
+          <NavLink to="/tasks">משימות</NavLink>
+          <NavLink to="/board">לוח אחראים</NavLink>
           <NavLink to="/chat">צ'אט</NavLink>
+          {isManager && <MoreMenu />}
         </nav>
         <Bell />
         <UserMenu name={me.data.displayName} personId={me.data.personId} isManager={isManager} />
@@ -79,10 +77,12 @@ export function App() {
           <Route path="/home" element={<HomePage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/people/:id" element={<ProfilePage />} />
-          <Route path="/my" element={<TasksPage scope="mine" />} />
-          {seesAll && <Route path="/all" element={<TasksPage scope="all" />} />}
-          {seesAll && <Route path="/tasks/new" element={<NewTaskPage />} />}
-          {seesAll && <Route path="/team" element={<TeamPage />} />}
+          <Route path="/tasks" element={<TasksHome />} />
+          <Route path="/my" element={<Navigate to="/tasks" replace />} />
+          <Route path="/all" element={<Navigate to="/tasks?scope=org" replace />} />
+          {canCreate && <Route path="/tasks/new" element={<NewTaskPage />} />}
+          <Route path="/board" element={<BoardPage />} />
+          <Route path="/team" element={<Navigate to="/board" replace />} />
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           {isManager && <Route path="/recurring" element={<RecurrencesPage />} />}
           {isManager && <Route path="/documents" element={<DocumentsPage />} />}
@@ -94,6 +94,49 @@ export function App() {
         </Routes>
       </main>
     </div>
+  );
+}
+
+/** Managers' less frequent pages, out of the main menu. */
+function MoreMenu() {
+  const close = (e: React.MouseEvent<HTMLAnchorElement>) => e.currentTarget.closest('details')?.removeAttribute('open');
+  return (
+    <details className="user-menu more-menu">
+      <summary>עוד ▾</summary>
+      <div className="menu">
+        <Link to="/people" onClick={close}>
+          ניהול אנשים
+        </Link>
+        <Link to="/recurring" onClick={close}>
+          משימות חוזרות
+        </Link>
+        <Link to="/documents" onClick={close}>
+          מסמכים
+        </Link>
+        <Link to="/import" onClick={close}>
+          ייבוא מטבלה או ממסמך
+        </Link>
+      </div>
+    </details>
+  );
+}
+
+/** One tasks page with a "mine / organisation" switch instead of two menu items. */
+function TasksHome() {
+  const [params, setParams] = useSearchParams();
+  const scope = params.get('scope') === 'org' ? 'all' : 'mine';
+  return (
+    <>
+      <div className="segmented" role="tablist">
+        <button role="tab" aria-selected={scope === 'mine'} className={scope === 'mine' ? 'active' : ''} onClick={() => setParams({})}>
+          המשימות שלי
+        </button>
+        <button role="tab" aria-selected={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setParams({ scope: 'org' })}>
+          משימות הארגון
+        </button>
+      </div>
+      <TasksPage key={scope} scope={scope} />
+    </>
   );
 }
 

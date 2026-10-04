@@ -14,7 +14,7 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * New messages arrive by polling every few seconds while the page is visible.
  * Typing "@" opens a list of people; tagged people get a notification on their home page.
  */
-export function ChatPanel({ taskId, involvedIds }: { taskId?: string; involvedIds?: string[] }) {
+export function ChatPanel({ taskId, privateTo }: { taskId?: string; privateTo?: string[] }) {
   const me = useMe();
   const people = usePeopleMap();
   const qc = useQueryClient();
@@ -100,13 +100,13 @@ export function ChatPanel({ taskId, involvedIds }: { taskId?: string; involvedId
     void qc.invalidateQueries({ queryKey: ['recent-chat'] });
   };
 
-  // Who can be tagged: people who sign in; in a task chat, guests only if they are on the task.
+  // Who can be tagged: people who sign in; in a private task only the people on it and managers.
   const candidates = useMemo(
     () =>
       people.list.filter(
-        (p) => p.active && p.role !== null && p.id !== me.data?.personId && (!taskId || p.role !== 'guest' || involvedIds?.includes(p.id)),
+        (p) => p.active && p.role !== null && p.id !== me.data?.personId && (!privateTo || p.role === 'manager' || privateTo.includes(p.id)),
       ),
-    [people.list, me.data?.personId, taskId, involvedIds],
+    [people.list, me.data?.personId, privateTo],
   );
 
   return (

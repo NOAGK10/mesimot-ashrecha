@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import type { PersonDto, PersonRole } from '@org/shared';
-import { api, useApiMutation, usePeople } from '../api';
+import { useQueryClient } from '@tanstack/react-query';
+import { ApiError, api, useApiMutation, usePeople } from '../api';
 import { ErrorText } from '../components/common';
 import { roleHint, roleLabel } from '../he';
 
@@ -63,13 +64,29 @@ export function PeoplePage() {
   const [role, setRole] = useState<PersonRole>(null);
   const create = useApiMutation(() => api('POST', '/api/people', { displayName: name, email, role, jobTitle: jobTitle.trim() || null }), KEYS);
   const update = useApiMutation(({ p, patch }: { p: PersonDto; patch: Record<string, unknown> }) => api('PATCH', `/api/people/${p.id}`, patch), KEYS);
+  const qc = useQueryClient();
+  const [deleteBlocked, setDeleteBlocked] = useState<PersonDto | null>(null);
+  const [deleteError, setDeleteError] = useState<unknown>(null);
+  /** Removes the person from the whole system: lists, tasks and sign-in. */
+  const removePerson = async (p: PersonDto) => {
+    if (!confirm(`למחוק את ${p.displayName} מהמערכת? הוא ייעלם מכל הרשימות והמשימות ולא יוכל להיכנס יותר.`)) return;
+    setDeleteBlocked(null);
+    setDeleteError(null);
+    try {
+      await api('POST', `/api/people/${p.id}/delete`);
+      await Promise.all([qc.invalidateQueries({ queryKey: ['people'] }), qc.invalidateQueries({ queryKey: ['tasks'] })]);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) setDeleteBlocked(p);
+      else setDeleteError(e);
+    }
+  };
 
   return (
     <section>
       <div className="page-head">
         <h1>ניהול אנשים</h1>
-        <Link className="button secondary-link" to="/team">
-          → לצוות
+        <Link className="button secondary-link" to="/board">
+          → ללוח האחראים
         </Link>
       </div>
       {/* Tags already in use are suggested, so everyone gets the same spelling. */}
@@ -146,6 +163,10 @@ export function PeoplePage() {
                 <button className="link" onClick={() => update.mutate({ p, patch: { active: !p.active } })}>
                   {p.active ? 'השבתה' : 'הפעלה מחדש'}
                 </button>
+                {' · '}
+                <button className="link danger-text" onClick={() => removePerson(p)}>
+                  מחיקה
+                </button>
                 {p.hasLogin && <span className="tag">מחובר ל-Google</span>}
               </td>
             </tr>
@@ -153,6 +174,13 @@ export function PeoplePage() {
         </tbody>
       </table>
       <ErrorText error={update.error} />
+      {deleteBlocked && (
+        <p className="error">
+          אי אפשר למחוק את {deleteBlocked.displayName}: יש משימות פתוחות או משימות חוזרות באחריותו. קודם מעבירים אותן למישהו אחר,{' '}
+          <Link to={`/people/${deleteBlocked.id}`}>מהפרופיל שלו</Link>, ואז מוחקים.
+        </p>
+      )}
+      <ErrorText error={deleteError} />
     </section>
   );
 }

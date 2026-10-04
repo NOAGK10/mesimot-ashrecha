@@ -67,7 +67,7 @@ export async function listInbox(ctx: AppContext, p: Principal, limit = 50): Prom
     .leftJoin(tasks, eq(tasks.id, inboxItems.taskId))
     .leftJoin(chatMessages, eq(chatMessages.id, inboxItems.messageId))
     .leftJoin(personFeedback, eq(personFeedback.id, inboxItems.feedbackId))
-    .where(eq(inboxItems.personId, p.personId))
+    .where(and(eq(inboxItems.personId, p.personId), isNull(tasks.deletedAt)))
     .orderBy(desc(inboxItems.id))
     .limit(limit);
   return rows.map(({ item, taskTitle, taskDueDate, body, deletedAt }) => ({

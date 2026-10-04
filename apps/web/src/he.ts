@@ -52,6 +52,9 @@ export const EVENT_LABEL: Record<string, string> = {
   'task.link_issued': 'נוצר קישור גישה',
   'task.document_linked': 'קושר מסמך',
   'task.document_unlinked': 'הוסר מסמך',
+  'task.category_changed': 'הקטגוריה שונתה',
+  'task.visibility_changed': 'השתנה מי רואה את המשימה',
+  'task.deleted': 'המשימה נמחקה',
 };
 
 export const WEEKDAYS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];

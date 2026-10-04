@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TaskDetailDto } from '@org/shared';
 import { api, useApiMutation, useDocuments, useMe, useTask } from '../api';
 import { AddDocument, KIND_ICON, KIND_LABEL } from '../components/AddDocument';
@@ -15,6 +16,7 @@ export function TaskDetailPage() {
   const task = useTask(id);
   const people = usePeopleMap(me.data?.access !== 'link');
   const [editing, setEditing] = useState(false);
+  const qc = useQueryClient();
 
   if (task.isLoading) return <p className="muted">טוען…</p>;
   if (task.error || !task.data) return <ErrorText error={task.error ?? new Error()} />;
@@ -25,6 +27,19 @@ export function TaskDetailPage() {
   const linkPeople = me.data?.access === 'manager' || me.data?.access === 'member';
   const lastEvent = t.events.at(-1);
 
+  const removeParticipant = async (pid: string) => {
+    if (!confirm(`להוציא את ${name(pid)} מהמשימה?`)) return;
+    await api('PUT', `/api/tasks/${t.id}/participants`, { version: t.version, participantIds: t.participantIds.filter((x) => x !== pid) });
+    await qc.invalidateQueries({ queryKey: ['task', t.id] });
+  };
+  const removeTask = async () => {
+    if (!confirm(`למחוק את המשימה "${t.title}"? היא תיעלם לכולם.`)) return;
+    await api('POST', `/api/tasks/${t.id}/delete`, { version: t.version });
+    await qc.invalidateQueries({ queryKey: ['tasks'] });
+    navigate('/tasks', { replace: true });
+  };
+  const insiders = [t.ownerPersonId, ...t.participantIds, ...(t.createdByPersonId ? [t.createdByPersonId] : [])];
+
   return (
     <section className="detail">
       {me.data?.access !== 'link' && (
@@ -34,12 +49,19 @@ export function TaskDetailPage() {
       )}
       <div className="card">
         <div className="page-head">
-          <h1>{t.title}</h1>
+          <h1>
+            {t.title} {t.visibility === 'private' && <span className="private-badge">🔒 פרטית</span>}
+          </h1>
           <div className="row-inline tight">
             <StatusBadge status={t.status} />
             {t.canEdit && !t.archivedAt && !editing && (
               <button className="secondary small-btn" onClick={() => setEditing(true)}>
                 עריכה
+              </button>
+            )}
+            {t.canDelete && (
+              <button className="secondary small-btn danger" onClick={removeTask}>
+                מחיקה
               </button>
             )}
           </div>
@@ -50,6 +72,28 @@ export function TaskDetailPage() {
           <dd>
             <PersonTag id={linkPeople ? t.ownerPersonId : undefined} avatarFor={linkPeople ? t.ownerPersonId : undefined} name={name(t.ownerPersonId)} jobTitle={t.jobTitles[t.ownerPersonId]} />
           </dd>
+          <dt>עד מתי</dt>
+          <dd className={t.isOverdue ? 'overdue' : ''}>
+            {formatDate(t.dueDate)}
+            {t.isOverdue && ' · באיחור'}
+          </dd>
+          {t.participantIds.length > 0 && (
+            <>
+              <dt>משתתפים</dt>
+              <dd className="people-list">
+                {t.participantIds.map((pid) => (
+                  <span key={pid} className="participant">
+                    <PersonTag id={linkPeople ? pid : undefined} avatarFor={linkPeople ? pid : undefined} name={name(pid)} jobTitle={t.jobTitles[pid]} />
+                    {t.canEdit && !t.archivedAt && (
+                      <button className="remove-x" onClick={() => removeParticipant(pid)} aria-label={`הוצאת ${name(pid)} מהמשימה`} title="הוצאה מהמשימה">
+                        ✕
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </dd>
+            </>
+          )}
           {t.categoryId && (
             <>
               <dt>קטגוריה</dt>
@@ -58,24 +102,8 @@ export function TaskDetailPage() {
               </dd>
             </>
           )}
-          <dt>מועד יעד</dt>
-          <dd className={t.isOverdue ? 'overdue' : ''}>
-            {formatDate(t.dueDate)}
-            {t.isOverdue && ' · באיחור'}
-          </dd>
-          <dt>משתתפים</dt>
-          <dd className="people-list">
-            {t.participantIds.length
-              ? t.participantIds.map((pid) => <PersonTag key={pid} id={linkPeople ? pid : undefined} avatarFor={linkPeople ? pid : undefined} name={name(pid)} jobTitle={t.jobTitles[pid]} />)
-              : '—'}
-          </dd>
-          {t.recurrenceDefinitionId && (
-            <>
-              <dt>חזרתיות</dt>
-              <dd>מופע של משימה חוזרת ({formatDate(t.occurrenceDate)})</dd>
-            </>
-          )}
         </dl>
+        {t.description && <p className="description">{t.description}</p>}
         {statusNote && (
           <p className={`status-note status-${t.status}`}>
             <strong>{STATUS_LABEL[t.status]}:</strong> {statusNote.note}
@@ -93,43 +121,41 @@ export function TaskDetailPage() {
         </div>
       )}
 
-      {t.description && (
-        <div className="card">
-          <h2>פרטים</h2>
-          <p className="description">{t.description}</p>
-        </div>
-      )}
-
-      <TaskDocuments task={t} />
-
       {me.data?.access !== 'link' && (
         <div className="card">
-          <h2>שיחה על המשימה</h2>
-          <ChatPanel taskId={t.id} involvedIds={[t.ownerPersonId, ...t.participantIds]} />
+          <h2>שיחה</h2>
+          <ChatPanel taskId={t.id} privateTo={t.visibility === 'private' ? insiders : undefined} />
         </div>
       )}
 
+      {/* Less used: documents, history and tools stay folded away. */}
       <details className="card collapsible">
         <summary>
-          <h2>היסטוריה</h2>
-          {lastEvent && (
-            <span className="muted small">
-              עודכן לאחרונה {formatDateTime(lastEvent.createdAt)} · {name(lastEvent.actorPersonId)}
-            </span>
-          )}
+          <h2>עוד</h2>
+          <span className="muted small">
+            מסמכים{t.documents.length > 0 && ` (${t.documents.length})`} · היסטוריה{t.canEdit && ' · כלי ניהול'}
+          </span>
         </summary>
-        <ol className="history">
-          {t.events.map((e) => (
-            <li key={e.id}>
-              <span className="muted small">{formatDateTime(e.createdAt)}</span> · <strong>{name(e.actorPersonId)}</strong> ·{' '}
-              {EVENT_LABEL[e.type] ?? e.type}
-              <EventDetail type={e.type} data={e.data} name={name} />
-            </li>
-          ))}
-        </ol>
+        <TaskDocuments task={t} />
+        <div className="sub-section">
+          <h3>היסטוריה</h3>
+          {lastEvent && (
+            <p className="muted small">
+              עודכן לאחרונה {formatDateTime(lastEvent.createdAt)} · {name(lastEvent.actorPersonId)}
+            </p>
+          )}
+          <ol className="history">
+            {t.events.map((e) => (
+              <li key={e.id}>
+                <span className="muted small">{formatDateTime(e.createdAt)}</span> · <strong>{name(e.actorPersonId)}</strong> ·{' '}
+                {EVENT_LABEL[e.type] ?? e.type}
+                <EventDetail type={e.type} data={e.data} name={name} />
+              </li>
+            ))}
+          </ol>
+        </div>
+        {t.canEdit && <ManagerTools task={t} name={name} />}
       </details>
-
-      {t.canEdit && <ManagerTools task={t} name={name} />}
     </section>
   );
 }
@@ -266,6 +292,9 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
   const [owner, setOwner] = useState(task.ownerPersonId);
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
   const [categoryId, setCategoryId] = useState(task.categoryId);
+  const [visibility, setVisibility] = useState(task.visibility);
+  const me = useMe();
+  const isManager = me.data?.access === 'manager';
   const [participants, setParticipants] = useState(task.participantIds);
   useEffect(() => setParticipants(task.participantIds), [task.participantIds]);
 
@@ -277,6 +306,7 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
       ownerPersonId: owner,
       dueDate: dueDate || null,
       categoryId,
+      visibility,
     });
     const next = participants.filter((p) => p !== owner);
     const same = next.length === task.participantIds.length && next.every((p) => task.participantIds.includes(p));
@@ -303,15 +333,28 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
         <textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
       </label>
       <div className="row">
+        {isManager && (
+          <label>
+            אחראי
+            <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
+          </label>
+        )}
         <label>
-          אחראי
-          <PersonSelect people={people.list} value={owner} onChange={setOwner} required />
-        </label>
-        <label>
-          מועד יעד
+          עד מתי
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </label>
       </div>
+      <fieldset className="visibility-choice compact">
+        <legend>מי רואה את המשימה?</legend>
+        <label className="check">
+          <input type="radio" name="edit-visibility" checked={visibility === 'org'} onChange={() => setVisibility('org')} />
+          🏢 כל הארגון
+        </label>
+        <label className="check">
+          <input type="radio" name="edit-visibility" checked={visibility === 'private'} onChange={() => setVisibility('private')} />
+          🔒 פרטית (רק מי שבמשימה ומנהלים)
+        </label>
+      </fieldset>
       <label>
         קטגוריה
         <CategorySelect value={categoryId} onChange={setCategoryId} />

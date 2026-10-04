@@ -11,6 +11,10 @@ export const PERSON_ROLES = ['manager', 'member', 'guest'] as const;
 /** null role = contact without login (email / magic link only). */
 export type PersonRole = (typeof PERSON_ROLES)[number] | null;
 
+/** org: everyone who signs in sees it · private: only its creator, owner, participants and managers. */
+export const TASK_VISIBILITIES = ['org', 'private'] as const;
+export type TaskVisibility = (typeof TASK_VISIBILITIES)[number];
+
 export const TASK_VIEWS = ['all', 'today', 'week', 'overdue', 'future', 'undated'] as const;
 export type TaskView = (typeof TASK_VIEWS)[number];
 
@@ -43,6 +47,8 @@ export const createTaskSchema = z.object({
   dueDate: isoDate.nullable().default(null),
   participantIds: z.array(uuid).max(100).default([]),
   categoryId: uuid.nullable().optional(),
+  /** Absent = 'org'. */
+  visibility: z.enum(TASK_VISIBILITIES).optional(),
 });
 export const updateTaskSchema = z.object({
   version: z.number().int().positive(),
@@ -51,6 +57,7 @@ export const updateTaskSchema = z.object({
   ownerPersonId: uuid.optional(),
   dueDate: isoDate.nullable().optional(),
   categoryId: uuid.nullable().optional(),
+  visibility: z.enum(TASK_VISIBILITIES).optional(),
 });
 export const changeStatusSchema = z.object({
   version: z.number().int().positive(),
@@ -364,6 +371,8 @@ export interface TaskDto {
   ownerPersonId: string;
   dueDate: string | null;
   categoryId: string | null;
+  visibility: TaskVisibility;
+  createdByPersonId: string | null;
   recurrenceDefinitionId: string | null;
   occurrenceDate: string | null;
   participantIds: string[];
@@ -385,6 +394,7 @@ export interface AuditEventDto {
 export interface TaskDetailDto extends TaskDto {
   allowedStatuses: TaskStatus[];
   canEdit: boolean;
+  canDelete: boolean;
   events: AuditEventDto[];
   /** Display names of everyone referenced by this task and its history. */
   names: Record<string, string>;

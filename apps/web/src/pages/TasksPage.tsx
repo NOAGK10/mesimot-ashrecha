@@ -7,7 +7,10 @@ import { CategoryChip } from '../components/Category';
 import { PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { STATUS_LABEL, VIEW_LABEL, formatDate } from '../he';
 
-/** Task list: my tasks, the whole organisation, or one person's personal page. */
+/**
+ * Task list: my tasks, the organisation's, or one person's (profile page).
+ * Kept simple: search and time tabs are always visible; the rest sits behind "סינון".
+ */
 export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person'; personId?: string }) {
   const me = useMe();
   const isManager = me.data?.access === 'manager';
@@ -36,37 +39,77 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
     q: query || undefined,
     includeArchived,
   });
+  const activeFilters = [owner, status, category, includeArchived ? 'x' : ''].filter(Boolean).length;
+  const clearFilters = () => (setOwner(''), setStatus(''), setCategory(''), setIncludeArchived(false));
 
   return (
     <section>
       <div className="page-head">
-        {scope === 'person' ? (
-          <PersonHeading name={people.name(personId!)} jobTitle={people.jobTitle(personId!)} />
-        ) : (
-          <h1>{scope === 'mine' ? 'המשימות שלי' : 'כל משימות הארגון'}</h1>
-        )}
+        {scope === 'person' ? <h2>המשימות</h2> : <span />}
         {canCreate && scope !== 'person' && (
-          <div className="actions tight">
-            {isManager && (
-              <Link className="button secondary-link" to="/import">
-                ייבוא מטבלה או ממסמך
-              </Link>
-            )}
-            <Link className="button" to="/tasks/new">
-              + משימה חדשה
-            </Link>
-          </div>
+          <Link className="button" to="/tasks/new">
+            + משימה חדשה
+          </Link>
         )}
       </div>
 
-      <input
-        type="search"
-        className="search"
-        placeholder="🔍 חיפוש משימה…"
-        aria-label="חיפוש משימה"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div className="list-tools">
+        <input type="search" className="search" placeholder="🔍 חיפוש…" aria-label="חיפוש משימה" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <details className="filter-menu">
+          <summary className={activeFilters ? 'button secondary-link active-filter' : 'button secondary-link'}>
+            סינון{activeFilters > 0 && ` (${activeFilters})`}
+          </summary>
+          <div className="filter-panel">
+            {scope === 'all' && (
+              <label>
+                אחראי
+                <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+                  <option value="">כולם</option>
+                  {people.list.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.displayName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label>
+              קטגוריה
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                <option value="">כל הקטגוריות</option>
+                {categories.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value="none">בלי קטגוריה</option>
+              </select>
+            </label>
+            <label>
+              סטטוס
+              <select value={status} onChange={(e) => setStatus(e.target.value as TaskStatus | '')}>
+                <option value="">{view === 'all' ? 'כל הסטטוסים' : 'פתוחות'}</option>
+                {TASK_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {isManager && (
+              <label className="check">
+                <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} />
+                כולל ארכיון
+              </label>
+            )}
+            {activeFilters > 0 && (
+              <button className="link" onClick={clearFilters}>
+                ניקוי הסינון
+              </button>
+            )}
+          </div>
+        </details>
+      </div>
 
       <div className="tabs" role="tablist">
         {TASK_VIEWS.map((v) => (
@@ -76,99 +119,36 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
         ))}
       </div>
 
-      <div className="filters">
-        {scope === 'all' && (
-          <label>
-            אחראי
-            <select value={owner} onChange={(e) => setOwner(e.target.value)}>
-              <option value="">כולם</option>
-              {people.list.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label>
-          קטגוריה
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="">כל הקטגוריות</option>
-            {categories.data?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-            <option value="none">בלי קטגוריה</option>
-          </select>
-        </label>
-        <label>
-          סטטוס
-          <select value={status} onChange={(e) => setStatus(e.target.value as TaskStatus | '')}>
-            <option value="">{view === 'all' ? 'כל הסטטוסים' : 'פתוחות'}</option>
-            {TASK_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {isManager && (
-          <label className="check">
-            <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} />
-            כולל ארכיון
-          </label>
-        )}
-      </div>
-
       {tasks.isLoading && <p className="muted">טוען…</p>}
-      {tasks.data?.length === 0 && <p className="empty">{query ? `לא נמצאו משימות עם "${query}" בתצוגה הזו.` : 'אין משימות בתצוגה הזו.'}</p>}
+      {tasks.data?.length === 0 && <p className="empty">{query ? `לא נמצאו משימות עם "${query}".` : 'אין כאן משימות.'}</p>}
       {tasks.data && tasks.data.length > 0 && (
-        <table className="task-table">
-          <thead>
-            <tr>
-              <th>משימה</th>
-              <th>אחראי</th>
-              <th>יעד</th>
-              <th>סטטוס</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.data.map((t) => (
-              <tr key={t.id} className={t.archivedAt ? 'archived' : ''}>
-                <td data-label="משימה">
-                  <Link to={`/tasks/${t.id}`}>{t.title}</Link>
+        <ul className="task-cards">
+          {tasks.data.map((t) => (
+            <li key={t.id} className={t.archivedAt ? 'archived' : ''}>
+              <Link to={`/tasks/${t.id}`} className="task-card-main">
+                <span className="task-card-title">
+                  {t.visibility === 'private' && (
+                    <span className="lock" title="משימה פרטית">
+                      🔒
+                    </span>
+                  )}
+                  {t.title}
+                </span>
+                <span className="task-card-meta">
+                  <StatusBadge status={t.status} />
+                  {t.dueDate && <span className={t.isOverdue ? 'overdue' : 'muted'}>{t.isOverdue ? `באיחור · ${formatDate(t.dueDate)}` : formatDate(t.dueDate)}</span>}
                   <CategoryChip categoryId={t.categoryId} />
                   {t.recurrenceDefinitionId && <span className="tag" title="משימה חוזרת">↻</span>}
                   {t.archivedAt && <span className="tag">ארכיון</span>}
-                </td>
-                <td data-label="אחראי">
-                  <PersonTag id={t.ownerPersonId} avatarFor={t.ownerPersonId} name={people.name(t.ownerPersonId)} jobTitle={people.jobTitle(t.ownerPersonId)} />
-                </td>
-                <td data-label="יעד" className={t.isOverdue ? 'overdue' : ''}>
-                  {formatDate(t.dueDate)}
-                  {t.isOverdue && ' · באיחור'}
-                </td>
-                <td data-label="סטטוס">
-                  <StatusBadge status={t.status} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </span>
+              </Link>
+              <span className="task-card-owner">
+                <PersonTag avatarFor={t.ownerPersonId} name={people.name(t.ownerPersonId)} />
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
-  );
-}
-
-function PersonHeading({ name, jobTitle }: { name: string; jobTitle: string | null }) {
-  return (
-    <div>
-      <h1 className="person-heading">
-        המשימות של {name}
-        {jobTitle && <span className="job-tag large">{jobTitle}</span>}
-      </h1>
-      <p className="muted small">משימות שהוא אחראי עליהן או משתתף בהן</p>
-    </div>
   );
 }

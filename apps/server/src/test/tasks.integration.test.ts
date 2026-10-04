@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { auditEvents, notifications, tasks } from '../db/schema';
-import { changeStatus, createTask, getTaskDetail, listTasks, setArchived, setParticipants, updateTask } from '../modules/tasks/task-service';
+import { changeStatus, createTask, deleteTask, getTaskDetail, listTasks, setArchived, setParticipants, updateTask } from '../modules/tasks/task-service';
+import { createPerson, deletePerson, listPeople } from '../modules/identity/people-service';
 import { createHarness, type Harness } from './harness';
 
 let h: Harness;
@@ -107,11 +108,12 @@ describe('task management', () => {
     expect(u.archivedAt).toBeNull();
   });
 
-  it('limits guests to tasks they are involved in, and to status changes', async () => {
-    const mine = await createTask(h.ctx, h.manager, { ...base, title: 'Guest task', ownerPersonId: h.manager.personId, dueDate: null, participantIds: [h.guest.personId] });
-    const other = await createTask(h.ctx, h.manager, { ...base, title: 'Not for guest', ownerPersonId: h.manager.personId, dueDate: null });
+  it('private tasks are hidden from people who are not on them; guests only change status', async () => {
+    const mine = await createTask(h.ctx, h.manager, { ...base, title: 'Guest task', ownerPersonId: h.manager.personId, dueDate: null, participantIds: [h.guest.personId], visibility: 'private' });
+    const other = await createTask(h.ctx, h.manager, { ...base, title: 'Not for guest', ownerPersonId: h.manager.personId, dueDate: null, visibility: 'private' });
     const visible = await listTasks(h.ctx, h.guest, { view: 'all', mine: false, includeArchived: false });
-    expect(visible.map((t) => t.id)).toEqual([mine.id]);
+    expect(visible.map((t) => t.id)).toContain(mine.id);
+    expect(visible.map((t) => t.id)).not.toContain(other.id);
     await expect(getTaskDetail(h.ctx, h.guest, other.id)).rejects.toMatchObject({ status: 404 });
     await expect(updateTask(h.ctx, h.guest, mine.id, { version: mine.version, title: 'x' })).rejects.toMatchObject({ status: 403 });
     await expect(createTask(h.ctx, h.guest, { ...base, title: 'x', ownerPersonId: h.guest.personId, dueDate: null })).rejects.toMatchObject({ status: 403 });
@@ -146,10 +148,51 @@ describe('task management', () => {
     const owned = await createTask(h.ctx, h.manager, { ...base, title: 'P-owned', ownerPersonId: h.contactId, dueDate: null });
     const joined = await createTask(h.ctx, h.manager, { ...base, title: 'P-joined', ownerPersonId: h.manager.personId, dueDate: null, participantIds: [h.contactId] });
     await createTask(h.ctx, h.manager, { ...base, title: 'P-other', ownerPersonId: h.manager.personId, dueDate: null });
+    const hidden = await createTask(h.ctx, h.manager, { ...base, title: 'P-private', ownerPersonId: h.contactId, dueDate: null, visibility: 'private' });
     const page = await listTasks(h.ctx, h.member, { view: 'all', mine: false, personId: h.contactId, includeArchived: false });
     expect(page.filter((t) => t.title.startsWith('P-')).map((t) => t.id).sort()).toEqual([owned.id, joined.id].sort());
-    // A guest looking at someone else's page still sees only tasks shared with the guest.
-    expect(await listTasks(h.ctx, h.guest, { view: 'all', mine: false, personId: h.contactId, includeArchived: false })).toEqual([]);
+    // Managers also see the person's private tasks.
+    const managerView = await listTasks(h.ctx, h.manager, { view: 'all', mine: false, personId: h.contactId, includeArchived: false });
+    expect(managerView.map((t) => t.id)).toContain(hidden.id);
+  });
+
+  it('the creator or a manager can delete a task; it disappears everywhere and the deletion is audited', async () => {
+    const t = await createTask(h.ctx, h.member, { ...base, title: 'D-to-delete', ownerPersonId: h.member.personId, dueDate: '2026-10-20' });
+    await expect(deleteTask(h.ctx, h.guest, t.id, t.version)).rejects.toMatchObject({ status: 403 });
+    expect((await getTaskDetail(h.ctx, h.member, t.id)).canDelete).toBe(true);
+    await deleteTask(h.ctx, h.member, t.id, t.version);
+    expect((await listTasks(h.ctx, h.manager, { view: 'all', mine: false, includeArchived: true })).some((x) => x.id === t.id)).toBe(false);
+    await expect(getTaskDetail(h.ctx, h.manager, t.id)).rejects.toMatchObject({ status: 404 });
+    expect(await h.ctx.db.select().from(notifications).where(eq(notifications.taskId, t.id))).toHaveLength(0);
+    const [audit] = await h.ctx.db.select().from(auditEvents).where(eq(auditEvents.entityId, t.id)).orderBy(desc(auditEvents.id)).limit(1);
+    expect(audit).toMatchObject({ type: 'task.deleted', actorPersonId: h.member.personId });
+  });
+
+  it('a private task of mine is not visible to others, and its creator can make it public', async () => {
+    const t = await createTask(h.ctx, h.member, { ...base, title: 'V-private', ownerPersonId: h.member.personId, dueDate: null, participantIds: [h.guest.personId], visibility: 'private' });
+    expect((await listTasks(h.ctx, h.partner, { view: 'all', mine: false, includeArchived: false })).some((x) => x.id === t.id)).toBe(true); // manager
+    const stranger = h.principal(h.contactId, 'member');
+    await expect(getTaskDetail(h.ctx, stranger, t.id)).rejects.toMatchObject({ status: 404 });
+    expect((await listTasks(h.ctx, h.guest, { view: 'all', mine: true, includeArchived: false })).some((x) => x.id === t.id)).toBe(true);
+    const pub = await updateTask(h.ctx, h.member, t.id, { version: t.version, visibility: 'org' });
+    expect(pub.visibility).toBe('org');
+    expect((await getTaskDetail(h.ctx, stranger, t.id)).visibility).toBe('org');
+    await expect(updateTask(h.ctx, h.member, t.id, { version: pub.version, ownerPersonId: h.partner.personId })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('deleting a person removes them from lists and tasks, but only once their open tasks are handed over', async () => {
+    const leaving = await createPerson(h.ctx, h.manager, { displayName: 'Leaving', email: 'leaving@example.org', role: 'member', jobTitle: null });
+    const owned = await createTask(h.ctx, h.manager, { ...base, title: 'X-owned', ownerPersonId: leaving.id, dueDate: null });
+    const joined = await createTask(h.ctx, h.manager, { ...base, title: 'X-joined', ownerPersonId: h.manager.personId, dueDate: null, participantIds: [leaving.id] });
+
+    await expect(deletePerson(h.ctx, h.manager, leaving.id)).rejects.toMatchObject({ status: 409 });
+    await updateTask(h.ctx, h.manager, owned.id, { version: owned.version, ownerPersonId: h.manager.personId });
+    await expect(deletePerson(h.ctx, h.member, leaving.id)).rejects.toMatchObject({ status: 403 });
+    await deletePerson(h.ctx, h.manager, leaving.id);
+
+    expect((await listPeople(h.ctx, h.manager)).some((x) => x.id === leaving.id)).toBe(false);
+    expect((await getTaskDetail(h.ctx, h.manager, joined.id)).participantIds).toEqual([]);
+    await expect(deletePerson(h.ctx, h.manager, h.manager.personId)).rejects.toMatchObject({ status: 400 });
   });
 
   it('searches title and description, treating % and _ literally', async () => {

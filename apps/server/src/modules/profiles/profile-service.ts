@@ -32,7 +32,7 @@ async function loadPerson(ctx: AppContext, p: Principal, id: string) {
     .from(people)
     .leftJoin(personAvatars, eq(personAvatars.personId, people.id))
     .where(eq(people.id, id));
-  if (!row || row.person.orgId !== p.orgId) throw notFound('Person');
+  if (!row || row.person.orgId !== p.orgId || row.person.deletedAt) throw notFound('Person');
   return row;
 }
 
@@ -47,7 +47,7 @@ export async function performanceScore(ctx: AppContext, orgId: string, personId:
   const now = ctx.now();
   const today = todayIn(org.timezone, now);
   const since = new Date(now.getTime() - WINDOW_DAYS * 86_400_000);
-  const owned = and(eq(tasks.orgId, orgId), eq(tasks.ownerPersonId, personId), isNull(tasks.archivedAt));
+  const owned = and(eq(tasks.orgId, orgId), eq(tasks.ownerPersonId, personId), isNull(tasks.archivedAt), isNull(tasks.deletedAt));
 
   const completed = await ctx.db
     .select({ dueDate: tasks.dueDate, completedAt: tasks.completedAt })
