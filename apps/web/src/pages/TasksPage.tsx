@@ -152,7 +152,9 @@ export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person
                 <PersonTag avatarFor={t.ownerPersonId} name={people.name(t.ownerPersonId)} />
                 {canDelete(t) && (
                   <button className="remove-x trash" onClick={() => askRemove(t)} disabled={remove.isPending} title="מחיקת המשימה" aria-label={`מחיקת המשימה ${t.title}`}>
-                    🗑
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" />
+                    </svg>
                   </button>
                 )}
               </span>

@@ -43,7 +43,7 @@ export function App() {
     return (
       <div className="shell">
         <header className="topbar">
-          <span className="brand">{me.data.organization.name}</span>
+          <span className="brand"><span className="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1" /><path d="m3 17 2 2 4-4" /><path d="M13 6h8M13 12h8M13 18h8" /></svg></span>{me.data.organization.name}</span>
           <span className="muted small">גישה באמצעות קישור · {me.data.displayName}</span>
         </header>
         <main className="content">
@@ -61,7 +61,7 @@ export function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="brand">{me.data.organization.name}</span>
+        <span className="brand"><span className="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1" /><path d="m3 17 2 2 4-4" /><path d="M13 6h8M13 12h8M13 18h8" /></svg></span>{me.data.organization.name}</span>
         <nav className="nav">
           <NavLink to="/home">בית</NavLink>
           <NavLink to="/tasks">משימות</NavLink>
