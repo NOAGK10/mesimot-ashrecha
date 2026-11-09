@@ -4,7 +4,7 @@ import type { AppContext } from '../../context';
 import { organizations, sheetContacts } from '../../db/schema';
 import { AppError, forbidden, invalid } from '../../lib/errors';
 import { parseGoogleUrl } from '../google/gateway';
-import { mapSheetRows, normHeader, readSheetRows } from '../google/sheet-table';
+import { mapSheetRows, normHeader, readSheetRows, sheetLink } from '../google/sheet-table';
 import { policy } from '../identity/policy';
 import { contactKey, listContactCategories } from './category-service';
 import type { Principal } from '../identity/principal';
@@ -32,13 +32,12 @@ export function contactFieldOf(header: string): SheetContactField | null {
 export const mapContactsSheet = (raw: string[][]) =>
   mapSheetRows(raw, { fieldOf: contactFieldOf, order: ['name', 'phone', 'email', 'responsible', 'address'], required: 'name' });
 
-const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
 
 async function sync(ctx: AppContext, orgId: string): Promise<void> {
   const [org] = await ctx.db.select().from(organizations).where(eq(organizations.id, orgId));
   if (!org?.contactsSheetId) return;
   try {
-    const { rows, unmatched } = mapContactsSheet(await readSheetRows(ctx, orgId, org.contactsSheetId, org.contactsSheetBy));
+    const { rows, unmatched } = mapContactsSheet(await readSheetRows(ctx, orgId, org.contactsSheetId, org.contactsSheetBy, org.contactsSheetGid));
     await ctx.db.transaction(async (tx) => {
       await tx.delete(sheetContacts).where(eq(sheetContacts.orgId, orgId));
       for (let i = 0; i < rows.length; i += 500) {
@@ -66,7 +65,7 @@ export async function getSheetContacts(ctx: AppContext, p: Principal): Promise<S
   const { categories, members } = await listContactCategories(ctx, p.orgId);
   return {
     categories,
-    sheetUrl: org?.contactsSheetId ? sheetUrl(org.contactsSheetId) : null,
+    sheetUrl: org?.contactsSheetId ? sheetLink(org.contactsSheetId, org.contactsSheetGid) : null,
     syncedAt: org?.contactsSyncedAt?.toISOString() ?? null,
     syncError: org?.contactsSyncError ?? null,
     unmatchedColumns: org?.contactsUnmatched ?? [],
@@ -82,12 +81,12 @@ export async function setContactsSheet(ctx: AppContext, p: Principal, url: strin
   if (!policy.isManager(p)) throw forbidden();
   const parsed = parseGoogleUrl(url);
   if (!parsed || parsed.kind !== 'google_sheet') throw invalid('This is not a Google Sheets link');
-  if (mapContactsSheet(await readSheetRows(ctx, p.orgId, parsed.fileId, p.personId)).rows.length === 0) {
+  if (mapContactsSheet(await readSheetRows(ctx, p.orgId, parsed.fileId, p.personId, parsed.gid)).rows.length === 0) {
     throw invalid('No rows with a name were found in the first tab of the sheet');
   }
   await ctx.db
     .update(organizations)
-    .set({ contactsSheetId: parsed.fileId, contactsSheetBy: p.personId, contactsSyncedAt: null, contactsSyncError: null })
+    .set({ contactsSheetId: parsed.fileId, contactsSheetGid: parsed.gid, contactsSheetBy: p.personId, contactsSyncedAt: null, contactsSyncError: null })
     .where(eq(organizations.id, p.orgId));
   await sync(ctx, p.orgId);
   return getSheetContacts(ctx, p);

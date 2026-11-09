@@ -90,11 +90,13 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
       .update(organizations)
       .set({
         institutionsSheetId: null,
+        institutionsSheetGid: null,
         institutionsSheetBy: null,
         institutionsSyncedAt: null,
         institutionsSyncError: null,
         institutionsUnmatched: null,
         contactsSheetId: null,
+        contactsSheetGid: null,
         contactsSheetBy: null,
         contactsSyncedAt: null,
         contactsSyncError: null,

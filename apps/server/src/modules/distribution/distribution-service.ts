@@ -4,7 +4,7 @@ import type { AppContext } from '../../context';
 import { distributionPoints, sheetSources } from '../../db/schema';
 import { AppError, forbidden, invalid } from '../../lib/errors';
 import { parseGoogleUrl } from '../google/gateway';
-import { mapSheetRows, normHeader, readSheetRows } from '../google/sheet-table';
+import { mapSheetRows, normHeader, readSheetRows, sheetLink } from '../google/sheet-table';
 import { policy } from '../identity/policy';
 import type { Principal } from '../identity/principal';
 
@@ -37,7 +37,7 @@ async function sync(ctx: AppContext, orgId: string): Promise<void> {
   const src = await source(ctx, orgId);
   if (!src) return;
   try {
-    const { rows, unmatched } = mapPointsSheet(await readSheetRows(ctx, orgId, src.sheetId, src.byPersonId));
+    const { rows, unmatched } = mapPointsSheet(await readSheetRows(ctx, orgId, src.sheetId, src.byPersonId, src.gid));
     await ctx.db.transaction(async (tx) => {
       await tx.delete(distributionPoints).where(eq(distributionPoints.orgId, orgId));
       for (let i = 0; i < rows.length; i += 500) {
@@ -62,7 +62,7 @@ export async function getDistributionPoints(ctx: AppContext, p: Principal): Prom
   }
   const rows = await ctx.db.select().from(distributionPoints).where(eq(distributionPoints.orgId, p.orgId)).orderBy(asc(distributionPoints.position));
   return {
-    sheetUrl: src ? `https://docs.google.com/spreadsheets/d/${src.sheetId}/edit` : null,
+    sheetUrl: src ? sheetLink(src.sheetId, src.gid) : null,
     syncedAt: src?.syncedAt?.toISOString() ?? null,
     syncError: src?.syncError ?? null,
     unmatchedColumns: src?.unmatched ?? [],
@@ -75,10 +75,10 @@ export async function setDistributionSheet(ctx: AppContext, p: Principal, url: s
   if (!policy.isManager(p)) throw forbidden();
   const parsed = parseGoogleUrl(url);
   if (!parsed || parsed.kind !== 'google_sheet') throw invalid('This is not a Google Sheets link');
-  if (mapPointsSheet(await readSheetRows(ctx, p.orgId, parsed.fileId, p.personId)).rows.length === 0) {
+  if (mapPointsSheet(await readSheetRows(ctx, p.orgId, parsed.fileId, p.personId, parsed.gid)).rows.length === 0) {
     throw invalid('No rows with a name were found in the first tab of the sheet');
   }
-  const row = { orgId: p.orgId, kind: KIND, sheetId: parsed.fileId, byPersonId: p.personId, syncedAt: null, syncError: null };
+  const row = { orgId: p.orgId, kind: KIND, sheetId: parsed.fileId, gid: parsed.gid, byPersonId: p.personId, syncedAt: null, syncError: null };
   await ctx.db.insert(sheetSources).values(row).onConflictDoUpdate({ target: [sheetSources.orgId, sheetSources.kind], set: row });
   await sync(ctx, p.orgId);
   return getDistributionPoints(ctx, p);

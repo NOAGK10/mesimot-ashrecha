@@ -4,7 +4,7 @@ import type { AppContext } from '../../context';
 import { institutions, organizations } from '../../db/schema';
 import { AppError, forbidden, invalid } from '../../lib/errors';
 import { parseGoogleUrl } from '../google/gateway';
-import { readSheetRows as readSheet } from '../google/sheet-table';
+import { readSheetRows as readSheet, sheetLink } from '../google/sheet-table';
 import { policy } from '../identity/policy';
 import type { Principal } from '../identity/principal';
 import { mapSheet } from './columns';
@@ -21,14 +21,13 @@ function assertCanView(p: Principal) {
   if (!policy.canCreateTask(p)) throw forbidden();
 }
 
-const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
 
 /** Replaces the list with the sheet's rows. On failure the old list stays and the error is recorded. */
 async function syncFromSheet(ctx: AppContext, orgId: string): Promise<void> {
   const [org] = await ctx.db.select().from(organizations).where(eq(organizations.id, orgId));
   if (!org?.institutionsSheetId) return;
   try {
-    const raw = await readSheet(ctx, orgId, org.institutionsSheetId, org.institutionsSheetBy);
+    const raw = await readSheet(ctx, orgId, org.institutionsSheetId, org.institutionsSheetBy, org.institutionsSheetGid);
     const { rows, unmatched } = mapSheet(raw);
     await ctx.db.transaction(async (tx) => {
       await tx.delete(institutions).where(eq(institutions.orgId, orgId));
@@ -60,7 +59,7 @@ export async function getInstitutions(ctx: AppContext, p: Principal, opts: { ref
   }
   const rows = await ctx.db.select().from(institutions).where(eq(institutions.orgId, p.orgId)).orderBy(asc(institutions.position));
   return {
-    sheetUrl: org?.institutionsSheetId ? sheetUrl(org.institutionsSheetId) : null,
+    sheetUrl: org?.institutionsSheetId ? sheetLink(org.institutionsSheetId, org.institutionsSheetGid) : null,
     syncedAt: org?.institutionsSyncedAt?.toISOString() ?? null,
     syncError: org?.institutionsSyncError ?? null,
     unmatchedColumns: org?.institutionsUnmatched ?? [],
@@ -85,11 +84,11 @@ export async function setInstitutionsSheet(ctx: AppContext, p: Principal, url: s
   const parsed = parseGoogleUrl(url);
   if (!parsed || parsed.kind !== 'google_sheet') throw invalid('This is not a Google Sheets link');
   // Check it can be read before saving it.
-  const raw = await readSheet(ctx, p.orgId, parsed.fileId, p.personId);
+  const raw = await readSheet(ctx, p.orgId, parsed.fileId, p.personId, parsed.gid);
   if (mapSheet(raw).rows.length === 0) throw invalid('No rows with a yeshiva / kollel name were found in the first tab of the sheet');
   await ctx.db
     .update(organizations)
-    .set({ institutionsSheetId: parsed.fileId, institutionsSheetBy: p.personId, institutionsSyncedAt: null, institutionsSyncError: null })
+    .set({ institutionsSheetId: parsed.fileId, institutionsSheetGid: parsed.gid, institutionsSheetBy: p.personId, institutionsSyncedAt: null, institutionsSyncError: null })
     .where(eq(organizations.id, p.orgId));
   await syncFromSheet(ctx, p.orgId);
   return getInstitutions(ctx, p);

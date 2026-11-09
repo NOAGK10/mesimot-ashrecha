@@ -34,7 +34,7 @@ export async function createHarness() {
       verify: async (credential) => (credential.startsWith('google:') ? { sub: `sub-${credential}`, email: credential.slice(7) } : null),
     },
     googleWorkspace: { api: fakeDrive.api, secrets: new SecretBox(randomBytes(32).toString('base64')) },
-    publicSheets: { fetchCsv: async (id) => fakeDrive.publicCsv.get(id) ?? null, fetchDocx: async (id) => fakeDrive.publicDocx.get(id) ?? null },
+    publicSheets: { fetchCsv: async (id, gid) => (gid ? (fakeDrive.publicCsv.get(`${id}#${gid}`) ?? (gid === '0' ? fakeDrive.publicCsv.get(id) : undefined)) : fakeDrive.publicCsv.get(id)) ?? null, fetchDocx: async (id) => fakeDrive.publicDocx.get(id) ?? null },
     log: pino({ level: 'silent' }),
     now: () => clock.now,
   };

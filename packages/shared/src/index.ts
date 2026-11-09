@@ -167,6 +167,8 @@ export interface CategoryDto {
 export interface SourceTable {
   name: string;
   rows: string[][];
+  /** The tab's id in Google Sheets (the "gid" in its link), when known. */
+  gid?: string;
 }
 export interface ImportPreviewDto {
   sourceName: string;

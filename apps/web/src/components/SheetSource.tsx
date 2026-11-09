@@ -29,7 +29,7 @@ const NOT_ACCESSIBLE = 'אין גישה לקובץ. בשיטס לוחצים "ש�
 export function sheetErrorText(e: unknown, cfg: SheetListConfig): string | null {
   if (!(e instanceof ApiError)) return null;
   if (e.code === 'sheet_not_accessible') return NOT_ACCESSIBLE;
-  if (/No rows/.test(e.message)) return `לא נמצאו בקובץ שורות עם "${cfg.requiredColumn}". בדקו שהנתונים נמצאים בלשונית הראשונה.`;
+  if (/No rows/.test(e.message)) return `לא נמצאו בקובץ שורות עם "${cfg.requiredColumn}". בדקו שהקישור הועתק כשהלשונית הנכונה פתוחה.`;
   if (/not a Google Sheets/.test(e.message)) return 'זה לא קישור לקובץ גוגל שיטס.';
   return null;
 }
@@ -114,7 +114,7 @@ export function ConnectSheet({ info, cfg, onDone }: { info: SheetSourceInfo; cfg
     >
       <h2>{info.sheetUrl ? `החלפת קובץ ה${cfg.noun}` : `חיבור קובץ ${cfg.noun}`}</h2>
       <p className="small">
-        מדביקים כאן קישור לקובץ גוגל שיטס. האתר יקרא את <strong>הלשונית הראשונה</strong>, ויתעדכן לבד בכל פעם שמשנים את הקובץ.
+        מדביקים כאן קישור לקובץ גוגל שיטס. האתר יקרא את <strong>הלשונית שפתוחה בקישור</strong> (מעתיקים את הכתובת כשהלשונית הנכונה פתוחה), ויתעדכן לבד בכל פעם שמשנים את הקובץ.
       </p>
       <div className="small">
         <strong>העמודות בקובץ:</strong>

@@ -11,17 +11,24 @@ import { driveIfConnected } from './connection-service';
 export const sheetNotAccessible = () =>
   new AppError(400, 'sheet_not_accessible', 'The sheet is private. Share it as "Anyone with the link can view", or connect Google Drive first.');
 
-/** Reads the first tab: through the connecting manager's Google account if possible, otherwise the public export. */
-export async function readSheetRows(ctx: AppContext, orgId: string, fileId: string, byPersonId: string | null): Promise<string[][]> {
+/** The address of a sheet (and tab) to show people. */
+export const sheetLink = (fileId: string, gid: string | null) => `https://docs.google.com/spreadsheets/d/${fileId}/edit${gid ? `#gid=${gid}` : ''}`;
+
+/**
+ * Reads the tab the link points to (its gid), or the first tab: through the connecting manager's Google
+ * account if possible, otherwise the public export.
+ */
+export async function readSheetRows(ctx: AppContext, orgId: string, fileId: string, byPersonId: string | null, gid: string | null = null): Promise<string[][]> {
   if (byPersonId) {
     const [by] = await ctx.db.select().from(people).where(eq(people.id, byPersonId));
     if (by && !by.deactivatedAt) {
       const drive = await driveIfConnected(ctx, { personId: by.id, orgId, access: 'manager', scopeTaskId: null, via: 'session' } as Principal).catch(() => null);
       const tables = drive ? await drive.api.readSpreadsheet(drive.refreshToken, fileId).catch(() => null) : null;
-      if (tables?.[0]) return tables[0].rows;
+      const table = gid ? tables?.find((t) => t.gid === gid) : tables?.[0];
+      if (table) return table.rows;
     }
   }
-  const csv = await ctx.publicSheets.fetchCsv(fileId).catch(() => null);
+  const csv = await ctx.publicSheets.fetchCsv(fileId, gid).catch(() => null);
   if (!csv) throw sheetNotAccessible();
   return parseCsv('גיליון', csv).table.rows;
 }

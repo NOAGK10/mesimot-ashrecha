@@ -33,6 +33,17 @@ describe('distribution points from a Google Sheet', () => {
     expect((await setDistributionSheet(h.ctx, h.manager, 'https://docs.google.com/spreadsheets/d/distributionSheet002/edit')).items).toHaveLength(2);
   });
 
+  it('reads the tab the link points to (gid), not the first one', async () => {
+    const ID = 'multiTabSheet0001';
+    h.fakeDrive.publicCsv.set(ID, csv([['שם', 'קיבלו?', 'נשלח?'], ['משפחת כהן', 'כן', 'לא']])); // first tab: families
+    h.fakeDrive.publicCsv.set(`${ID}#670543334`, csv([['שם', 'טלפון', 'עיר', 'הערות'], ['מוקד א', '1', 'חולון', ''], ['מוקד ב', '2', 'אלעד', 'x'], ['מוקד ג', '', 'צפת', '']]));
+    const r = await setDistributionSheet(h.ctx, h.manager, `https://docs.google.com/spreadsheets/d/${ID}/edit?gid=670543334#gid=670543334`);
+    expect(r.items.map((i) => i.name)).toEqual(['מוקד א', 'מוקד ב', 'מוקד ג']);
+    expect(r.sheetUrl).toBe(`https://docs.google.com/spreadsheets/d/${ID}/edit#gid=670543334`);
+    // Later updates keep reading that tab.
+    expect((await refreshDistributionPoints(h.ctx, h.manager)).items).toHaveLength(3);
+  });
+
   it('is separate from the other sheet lists, and closed to guests; only managers connect', async () => {
     expect((await getSheetContacts(h.ctx, h.manager)).sheetUrl).toBeNull();
     await expect(getDistributionPoints(h.ctx, h.guest)).rejects.toMatchObject({ status: 403 });
@@ -40,10 +51,19 @@ describe('distribution points from a Google Sheet', () => {
   });
 
   it('if the sheet becomes unreadable the last list stays, with the reason', async () => {
-    h.fakeDrive.publicCsv.delete('distributionSheet002');
+    h.fakeDrive.publicCsv.clear();
     await expect(refreshDistributionPoints(h.ctx, h.manager)).rejects.toMatchObject({ status: 400 });
     const r = await getDistributionPoints(h.ctx, h.manager);
-    expect(r.items).toHaveLength(2);
+    expect(r.items).toHaveLength(3);
     expect(r.syncError).toMatch(/private/);
+  });
+});
+
+describe('Google links', () => {
+  it('finds the tab in a link', async () => {
+    const { parseGoogleUrl } = await import('../modules/google/gateway');
+    expect(parseGoogleUrl('https://docs.google.com/spreadsheets/d/1QECBbO9huryz9DY0KTU/edit?gid=670543334#gid=670543334')).toEqual({ fileId: '1QECBbO9huryz9DY0KTU', kind: 'google_sheet', gid: '670543334' });
+    expect(parseGoogleUrl('https://docs.google.com/spreadsheets/d/1QECBbO9huryz9DY0KTU/edit#gid=12')?.gid).toBe('12');
+    expect(parseGoogleUrl('https://docs.google.com/spreadsheets/d/1QECBbO9huryz9DY0KTU/edit')?.gid).toBeNull();
   });
 });

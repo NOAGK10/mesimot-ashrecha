@@ -33,7 +33,8 @@ export interface GoogleWorkspace {
 
 /** Reads a Google Sheet that is shared "anyone with the link", without any authorization. */
 export interface PublicSheets {
-  fetchCsv(fileId: string): Promise<string | null>;
+  /** The first tab, or the tab with this gid (the number after "gid=" in the link). */
+  fetchCsv(fileId: string, gid?: string | null): Promise<string | null>;
   /** A Google Doc shared "anyone with the link", exported as .docx. */
   fetchDocx(fileId: string): Promise<Buffer | null>;
 }
@@ -92,11 +93,12 @@ export function googleWorkspace(clientId: string, clientSecret: string): GoogleW
       const c = clientFor(refreshToken);
       const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(fileId)}`;
       try {
-        const meta = await c.request<{ sheets: Array<{ properties: { title: string } }> }>({
+        const meta = await c.request<{ sheets: Array<{ properties: { title: string; sheetId?: number } }> }>({
           url: base,
-          params: { fields: 'sheets.properties.title' },
+          params: { fields: 'sheets.properties.title,sheets.properties.sheetId' },
         });
         const titles = meta.data.sheets.map((s) => s.properties.title);
+        const gids = meta.data.sheets.map((s) => (s.properties.sheetId === undefined ? undefined : String(s.properties.sheetId)));
         if (titles.length === 0) return [];
         const values = await c.request<{ valueRanges: Array<{ values?: string[][] }> }>({
           url: `${base}/values:batchGet`,
@@ -106,7 +108,7 @@ export function googleWorkspace(clientId: string, clientSecret: string): GoogleW
               .flatMap(([k, v]) => (Array.isArray(v) ? v : [v]).map((x) => `${k}=${encodeURIComponent(String(x))}`))
               .join('&'),
         });
-        return titles.map((name, i) => ({ name, rows: values.data.valueRanges[i]?.values ?? [] }));
+        return titles.map((name, i) => ({ name, gid: gids[i], rows: values.data.valueRanges[i]?.values ?? [] }));
       } catch (err) {
         if (notFound(err)) return null;
         throw err;
@@ -154,9 +156,10 @@ export function googleWorkspace(clientId: string, clientSecret: string): GoogleW
 
 /** Only ever fetches docs.google.com URLs built from a validated file id, never user-supplied URLs. */
 export const publicSheets: PublicSheets = {
-  async fetchCsv(fileId) {
+  async fetchCsv(fileId, gid) {
     if (!/^[\w-]{10,200}$/.test(fileId)) return null;
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv`, { redirect: 'follow' });
+    if (gid && !/^\d{1,15}$/.test(gid)) return null;
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv${gid ? `&gid=${gid}` : ''}`, { redirect: 'follow' });
     const type = res.headers.get('content-type') ?? '';
     if (!res.ok || !type.includes('text/csv')) return null;
     return res.text();
@@ -171,7 +174,7 @@ export const publicSheets: PublicSheets = {
 };
 
 /** Extracts the file id and kind from a Google Docs/Sheets/Drive URL. */
-export function parseGoogleUrl(url: string): { fileId: string; kind: 'google_doc' | 'google_sheet' | 'link' } | null {
+export function parseGoogleUrl(url: string): { fileId: string; kind: 'google_doc' | 'google_sheet' | 'link'; gid: string | null } | null {
   let u: URL;
   try {
     u = new URL(url);
@@ -183,7 +186,10 @@ export function parseGoogleUrl(url: string): { fileId: string; kind: 'google_doc
   const fileId = m?.[1];
   if (!fileId || !/^[\w-]{10,200}$/.test(fileId)) return null;
   const kind = u.pathname.startsWith('/document/') ? 'google_doc' : u.pathname.startsWith('/spreadsheets/') ? 'google_sheet' : 'link';
-  return { fileId, kind };
+  // The tab: "#gid=123" or "?gid=123" (Sheets puts it in both).
+  const gidRaw = /(?:^|[#&])gid=(\d{1,15})/.exec(u.hash)?.[1] ?? u.searchParams.get('gid');
+  const gid = gidRaw && /^\d{1,15}$/.test(gidRaw) ? gidRaw : null;
+  return { fileId, kind, gid };
 }
 
 export function kindFromMime(mimeType: string): 'google_doc' | 'google_sheet' | 'link' {

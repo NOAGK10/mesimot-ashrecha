@@ -60,6 +60,8 @@ export const organizations = pgTable('organizations', {
   financeOpeningAgorot: bigint('finance_opening_agorot', { mode: 'number' }).notNull().default(0),
   /** The Google Sheet the institutions list is read from. */
   institutionsSheetId: text('institutions_sheet_id'),
+  /** The tab in that sheet (gid); null = the first tab. */
+  institutionsSheetGid: text('institutions_sheet_gid'),
   /** The manager who connected it; their Google connection is used to read a private sheet. */
   institutionsSheetBy: uuid('institutions_sheet_by'),
   institutionsSyncedAt: ts('institutions_synced_at'),
@@ -67,6 +69,7 @@ export const organizations = pgTable('organizations', {
   institutionsUnmatched: jsonb('institutions_unmatched').$type<string[]>(),
   /** The Google Sheet the contacts list is read from (same fields as the institutions sheet). */
   contactsSheetId: text('contacts_sheet_id'),
+  contactsSheetGid: text('contacts_sheet_gid'),
   contactsSheetBy: uuid('contacts_sheet_by'),
   contactsSyncedAt: ts('contacts_synced_at'),
   contactsSyncError: text('contacts_sync_error'),
@@ -646,6 +649,8 @@ export const sheetSources = pgTable(
     orgId: uuid('org_id').notNull().references(() => organizations.id),
     kind: text('kind').notNull(),
     sheetId: text('sheet_id').notNull(),
+    /** The tab in that sheet (gid); null = the first tab. */
+    gid: text('gid'),
     /** The manager who connected it; their Google connection is used to read a private sheet. */
     byPersonId: uuid('by_person_id'),
     syncedAt: ts('synced_at'),
