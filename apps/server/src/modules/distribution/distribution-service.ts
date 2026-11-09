@@ -67,6 +67,7 @@ export async function getDistributionPoints(ctx: AppContext, p: Principal): Prom
   const rows = await ctx.db.select().from(distributionPoints).where(eq(distributionPoints.orgId, p.orgId)).orderBy(asc(distributionPoints.position));
   return {
     headers: src?.stats?.headers ?? [],
+    fieldColumns: src?.stats?.columns ?? {},
     stats: src?.stats && policy.isManager(p) ? { rowsInSheet: src.stats.rowsInSheet, loaded: src.stats.loaded, skipped: src.stats.skipped, columns: src.stats.columns, manual: !!src.columns } : null,
     sheetUrl: src ? sheetLink(src.sheetId, src.gid) : null,
     syncedAt: src?.syncedAt?.toISOString() ?? null,

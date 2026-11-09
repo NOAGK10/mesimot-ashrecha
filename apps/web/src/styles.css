@@ -907,3 +907,20 @@ a.inst-line:hover, .inst-contact a:hover { color: var(--accent); }
 .sheet-table td.sheet-note { background: #fff7f2; }
 .sheet-table a { color: #1a73e8; text-decoration: none; white-space: nowrap; }
 .inst-bar .segmented { margin-bottom: 0; }
+
+/* Distribution points: our own table – city on the right, grouped */
+.pt-wrap { overflow: auto; max-height: calc(100vh - 250px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.pt-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.92rem; }
+.pt-table thead th { position: sticky; top: 0; z-index: 2; background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; text-align: start; padding: 10px 12px; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.pt-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; text-align: start; overflow-wrap: anywhere; }
+.pt-table tbody.pt-group:last-child tr:last-child td, .pt-table tbody.pt-group:last-child th.pt-city { border-bottom: none; }
+.pt-table th.pt-city { text-align: start; vertical-align: top; padding: 10px 14px; min-width: 110px; }
+.pt-table tbody th.pt-city { background: var(--bg); border-bottom: 2px solid var(--border); border-inline-end: 1px solid var(--border); font-weight: 700; }
+.pt-table tbody th.pt-city span { display: block; font-size: 1rem; color: var(--text); }
+.pt-table tbody th.pt-city small { display: block; margin-top: 2px; font-weight: 400; color: var(--muted); font-size: 0.78rem; }
+.pt-table tbody tr:last-child td { border-bottom: 2px solid var(--border); }
+.pt-table tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.pt-name { font-weight: 600; min-width: 120px; }
+.pt-phone a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.pt-notes { min-width: 160px; white-space: pre-wrap; }
+.pt-table tr.has-notes td.pt-notes { background: #fff4ec; color: #9a3412; }

@@ -115,7 +115,7 @@ export function DistributionPage() {
       {choosing && <ColumnsDialog onClose={() => setChoosing(false)} />}
 
       {items.length > 0 && shown.length === 0 && <p className="muted">אין מוקדים שמתאימים לחיפוש.</p>}
-      {view === 'table' && shown.length > 0 && <SheetTable headers={d.headers} rows={shown} phoneColumn={d.stats?.columns.phone} notesColumn={d.stats?.columns.notes} />}
+      {view === 'table' && shown.length > 0 && <PointsTable headers={d.headers} fieldColumns={d.fieldColumns} rows={shown} />}
       {view === 'cards' && <ul className="plain inst-grid">
         {shown.map((i) => (
           <li key={i.id} className={`inst-card${i.notes ? ' has-notes' : ''}`}>
@@ -153,60 +153,77 @@ export function DistributionPage() {
   );
 }
 
-const looksLikePhone = (v: string) => /^[\d\s+()*#-]{7,}$/.test(v) && v.replace(/\D/g, '').length >= 7;
+type Point = DistributionPointsDto['items'][number];
 
-/** The list exactly as the sheet: its header row, its columns in order, row numbers and grid lines. */
-function SheetTable({
-  headers,
-  rows,
-  phoneColumn,
-  notesColumn,
-}: {
-  headers: string[];
-  rows: DistributionPointsDto['items'];
-  phoneColumn?: string;
-  notesColumn?: string;
-}) {
-  // Columns without a header and without any value are left out, like an unused column in the sheet.
+/**
+ * Our own table of the points: city first (on the right), then name and phone, the sheet's other
+ * columns, and notes last. Sorted by city, each city written once beside its points.
+ */
+function PointsTable({ headers, fieldColumns, rows }: { headers: string[]; fieldColumns: Record<string, string>; rows: Point[] }) {
+  const mapped = new Set(['name', 'phone', 'city', 'notes'].map((f) => fieldColumns[f]).filter(Boolean));
+  // The sheet's other columns: with a header or a value, and not just repeating the name.
   const width = Math.max(headers.length, ...rows.map((r) => r.cells.length));
-  const cols = Array.from({ length: width }, (_, i) => i).filter((i) => (headers[i] ?? '').trim() || rows.some((r) => r.cells[i]));
-  const notesAt = notesColumn ? headers.indexOf(notesColumn) : -1;
-  if (rows.every((r) => r.cells.length === 0)) {
-    return <p className="muted small">לחצו "עדכון עכשיו" כדי לטעון את הטבלה מהקובץ.</p>;
+  const others = Array.from({ length: width }, (_, i) => i).filter((i) => {
+    const h = (headers[i] ?? '').trim();
+    if (h && mapped.has(h)) return false;
+    const values = rows.map((r) => r.cells[i] ?? '');
+    if (!values.some(Boolean)) return false;
+    return !rows.every((r) => !(r.cells[i] ?? '') || (r.cells[i] ?? '') === r.name);
+  });
+  const label = (i: number) => {
+    const h = (headers[i] ?? '').trim();
+    return !h || /^עמודה\s*\d+$/.test(h) ? 'פרטים' : h.replace(/[?:]\s*$/, '');
+  };
+
+  const sorted = [...rows].sort((x, y) => (x.city || '\uffff').localeCompare(y.city || '\uffff', 'he') || x.name.localeCompare(y.name, 'he'));
+  const groups: { city: string; rows: Point[] }[] = [];
+  for (const r of sorted) {
+    if (groups.at(-1)?.city !== r.city) groups.push({ city: r.city, rows: [] });
+    groups.at(-1)!.rows.push(r);
   }
+
   return (
-    <div className="sheet-wrap">
-      <table className="sheet-table">
+    <div className="pt-wrap">
+      <table className="pt-table">
         <thead>
           <tr>
-            <th className="sheet-num" aria-label="מספר שורה" />
-            {cols.map((c) => (
-              <th key={c}>{headers[c] || ''}</th>
+            <th className="pt-city">עיר</th>
+            <th>שם</th>
+            <th>טלפון</th>
+            {others.map((i) => (
+              <th key={i}>{label(i)}</th>
             ))}
+            <th className="pt-notes-h">הערות</th>
           </tr>
         </thead>
-        <tbody>
-          {rows.map((r, n) => (
-            <tr key={r.id} className={notesAt >= 0 && r.cells[notesAt] ? 'has-notes' : ''}>
-              <td className="sheet-num">{n + 1}</td>
-              {cols.map((c) => {
-                const v = r.cells[c] ?? '';
-                const phone = v && (headers[c] === phoneColumn || looksLikePhone(v));
-                return (
-                  <td key={c} className={c === notesAt && v ? 'sheet-note' : ''}>
-                    {phone ? (
-                      <a href={telHref(v)} dir="ltr">
-                        {v}
-                      </a>
-                    ) : (
-                      v
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
+        {groups.map((g) => (
+          <tbody key={g.city || '-'} className="pt-group">
+            {g.rows.map((r, n) => (
+              <tr key={r.id} className={r.notes ? 'has-notes' : ''}>
+                {n === 0 && (
+                  <th scope="rowgroup" rowSpan={g.rows.length} className="pt-city">
+                    <span>{g.city || 'ללא עיר'}</span>
+                    {g.rows.length > 1 && <small>{g.rows.length} מוקדים</small>}
+                  </th>
+                )}
+                <td className="pt-name">{r.name || <span className="muted">—</span>}</td>
+                <td className="pt-phone">
+                  {r.phone ? (
+                    <a href={telHref(r.phone)} dir="ltr">
+                      {r.phone}
+                    </a>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
+                {others.map((i) => (
+                  <td key={i}>{r.cells[i] ?? ''}</td>
+                ))}
+                <td className="pt-notes">{r.notes}</td>
+              </tr>
+            ))}
+          </tbody>
+        ))}
       </table>
     </div>
   );

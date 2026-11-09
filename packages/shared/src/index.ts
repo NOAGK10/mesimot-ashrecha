@@ -760,6 +760,8 @@ export const distributionColumnsSchema = z.object({
 export interface DistributionPointsDto {
   /** The sheet's header row, to show the list as the sheet's own table. */
   headers: string[];
+  /** Which sheet column holds each field (name, phone, city, notes); '' = none. */
+  fieldColumns: Record<string, string>;
   stats: SheetReadStats | null;
   sheetUrl: string | null;
   syncedAt: string | null;
