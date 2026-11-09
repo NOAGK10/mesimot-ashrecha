@@ -628,3 +628,41 @@ button.danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--
 .reset-list li::marker { color: #dc2626; }
 .reset-list.keep li::marker { color: #16a34a; }
 .reset-done { color: #15803d; font-weight: 500; }
+
+/* Call log */
+.calls-page { max-width: 820px; }
+.calls-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.calls-top p { margin: 0; }
+.calls-new { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.calls-filters { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
+.calls-filters input[type="search"] { max-width: 360px; }
+.call-chips, .call-status-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.call-status-pick { border: none; padding: 0; margin: 0; }
+.call-status-pick legend { margin-bottom: 6px; font-weight: 500; }
+.call-chip { --c: var(--accent); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 0.3rem 0.9rem; font-weight: 500; }
+.call-chip span { color: var(--muted); font-size: 0.85em; margin-inline-start: 2px; }
+.call-chip:hover:not(:disabled) { border-color: var(--c); background: var(--surface) !important; color: var(--text) !important; }
+.call-chip.active, .call-chip.active:hover:not(:disabled) { background: var(--c) !important; border-color: var(--c) !important; color: #fff !important; }
+.call-chip.active span { color: rgba(255, 255, 255, 0.85); }
+.s-answered { --c: #16a34a; }
+.s-missed { --c: #dc2626; }
+.s-approved { --c: #2563eb; }
+.s-disconnected { --c: #6b7280; }
+.s-callback { --c: #ea580c; }
+.s-done { --c: #0d9488; }
+.calls-day { color: var(--muted); font-size: 0.85rem; font-weight: 500; margin: 18px 0 8px; }
+.calls-list { display: flex; flex-direction: column; gap: 10px; }
+.call-card { background: var(--surface); border: 1px solid var(--border); border-inline-start: 4px solid var(--c, var(--border)); border-radius: var(--radius); padding: 12px 14px; }
+.call-card:has(.s-answered) { --c: #16a34a; } .call-card:has(.s-missed) { --c: #dc2626; } .call-card:has(.s-approved) { --c: #2563eb; }
+.call-card:has(.s-disconnected) { --c: #6b7280; } .call-card:has(.s-callback) { --c: #ea580c; } .call-card:has(.s-done) { --c: #0d9488; }
+.call-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.call-status { background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c); border-radius: 999px; padding: 2px 10px; font-size: 0.82rem; font-weight: 600; }
+.call-name { font-size: 1.02rem; }
+.call-phone { color: var(--accent); text-decoration: none; }
+.call-meta { margin-inline-start: auto; }
+.call-summary { margin: 8px 0 0; white-space: pre-wrap; line-height: 1.6; }
+.call-actions { display: flex; gap: 14px; margin-top: 8px; }
+.call-form h2 { margin: 0; }
+.call-when input { max-width: 240px; }
+.calls-empty { text-align: center; padding: 40px 16px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
+.calls-empty p { margin: 4px 0; }

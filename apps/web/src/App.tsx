@@ -13,6 +13,7 @@ import { DevOutboxPage } from './pages/DevOutboxPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { ImportPage } from './pages/ImportPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { CallsPage } from './pages/CallsPage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage, useInbox } from './pages/HomePage';
 import { Avatar } from './components/Avatar';
@@ -102,6 +103,7 @@ export function App() {
           {isManager && <Route path="/people" element={<PeoplePage />} />}
           {isManager && <Route path="/ops" element={<OpsPage />} />}
           {isManager && <Route path="/settings" element={<SettingsPage />} />}
+          {isManager && <Route path="/calls" element={<CallsPage />} />}
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>

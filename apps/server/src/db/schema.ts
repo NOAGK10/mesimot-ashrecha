@@ -17,6 +17,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import {
+  CALL_DIRECTIONS,
+  CALL_STATUSES,
   CHAT_ATTACHMENT_KINDS,
   DOCUMENT_KINDS,
   INBOX_KINDS,
@@ -455,3 +457,28 @@ export const workerHeartbeats = pgTable('worker_heartbeats', {
   lastError: text('last_error'),
   lastErrorAt: ts('last_error_at'),
 });
+
+// ---------------- Call log ----------------
+
+export const callStatus = pgEnum('call_status', CALL_STATUSES);
+export const callDirection = pgEnum('call_direction', CALL_DIRECTIONS);
+
+/** Phone calls a manager logs for themselves; only the person who logged a call sees it. */
+export const calls = pgTable(
+  'calls',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    ownerPersonId: uuid('owner_person_id').notNull().references(() => people.id),
+    callerName: text('caller_name').notNull().default(''),
+    phone: text('phone').notNull().default(''),
+    personId: uuid('person_id').references(() => people.id),
+    direction: callDirection('direction').notNull().default('in'),
+    status: callStatus('status').notNull(),
+    summary: text('summary').notNull().default(''),
+    occurredAt: ts('occurred_at').notNull(),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('calls_owner_idx').on(t.ownerPersonId, t.occurredAt)],
+);

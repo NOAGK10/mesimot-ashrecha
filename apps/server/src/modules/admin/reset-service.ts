@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, like, ne } from 'drizzle-orm';
 import type { AppContext } from '../../context';
 import {
   auditEvents,
+  calls,
   chatReads,
   documentCategories,
   documents,
@@ -29,6 +30,7 @@ export interface ResetResult {
   categories: number;
   documents: number;
   feedback: number;
+  calls: number;
   people: number;
 }
 
@@ -65,6 +67,8 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
     const deletedDocs = await tx.delete(documents).where(eq(documents.orgId, org)).returning({ id: documents.id });
     await tx.delete(documentCategories).where(eq(documentCategories.orgId, org));
 
+    const deletedCalls = await tx.delete(calls).where(eq(calls.orgId, org)).returning({ id: calls.id });
+
     // Profiles: feedback (its notifications and inbox items cascade) and "responsible for".
     const deletedFeedback = await tx.delete(personFeedback).where(eq(personFeedback.orgId, org)).returning({ id: personFeedback.id });
     await tx.update(people).set({ responsibilities: null }).where(eq(people.orgId, org));
@@ -89,6 +93,7 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
       categories: deletedCats.length,
       documents: deletedDocs.length,
       feedback: deletedFeedback.length,
+      calls: deletedCalls.length,
       people: otherIds.length,
     };
     await recordAudit(tx, { orgId: org, entityType: 'organization', entityId: org, type: 'org.content_reset', actor: actorOf(p), data: { ...result } });

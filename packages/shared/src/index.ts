@@ -494,3 +494,36 @@ export interface MeDto {
 export interface ApiErrorDto {
   error: { code: string; message: string; details?: unknown };
 }
+
+// ---------------- Call log ----------------
+
+/** Phone calls a manager logs: who called, what happened and what was said. */
+export const CALL_STATUSES = ['answered', 'missed', 'approved', 'disconnected', 'callback', 'done'] as const;
+export type CallStatus = (typeof CALL_STATUSES)[number];
+export const CALL_DIRECTIONS = ['in', 'out'] as const;
+export type CallDirection = (typeof CALL_DIRECTIONS)[number];
+
+export const callSchema = z
+  .object({
+    callerName: z.string().trim().max(120).default(''),
+    phone: z.string().trim().max(30).regex(/^[\d\s+()*#-]*$/, 'Invalid phone').default(''),
+    personId: z.uuid().nullable().default(null),
+    direction: z.enum(CALL_DIRECTIONS).default('in'),
+    status: z.enum(CALL_STATUSES),
+    summary: z.string().trim().max(5000).default(''),
+    occurredAt: z.iso.datetime({ offset: true }),
+  })
+  .refine((c) => c.callerName || c.phone || c.personId, { message: 'Enter a name or a phone number', path: ['callerName'] });
+export type CallInput = z.infer<typeof callSchema>;
+
+export interface CallDto {
+  id: string;
+  callerName: string;
+  phone: string;
+  personId: string | null;
+  direction: CallDirection;
+  status: CallStatus;
+  summary: string;
+  occurredAt: string;
+  updatedAt: string;
+}

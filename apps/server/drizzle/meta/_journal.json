@@ -71,6 +71,13 @@
       "when": 1794233923718,
       "tag": "0009_chat_dm_files_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794243046939,
+      "tag": "0010_call_log",
+      "breakpoints": true
     }
   ]
 }

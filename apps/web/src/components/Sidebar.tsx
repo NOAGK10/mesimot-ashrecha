@@ -28,6 +28,7 @@ const ICONS = {
     'M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z',
   mic: 'M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
   trash: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  phone: 'M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z',
   chevron: 'M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z',
 } as const;
 
@@ -48,6 +49,8 @@ const MAIN: Item[] = [
   { to: '/board', label: 'לוח אחראים', icon: 'people' },
   { to: '/chat', label: "צ'אט", icon: 'chat' },
 ];
+/** Managers only, next to the chat. */
+const CALLS: Item = { to: '/calls', label: 'שיחות', icon: 'phone' };
 const ADMIN: Item[] = [
   { to: '/people', label: 'ניהול אנשים', icon: 'manage', end: true },
   { to: '/recurring', label: 'משימות חוזרות', icon: 'recurring' },
@@ -60,7 +63,7 @@ export function pageTitle(pathname: string): string {
   if (pathname.startsWith('/tasks/new')) return 'משימה חדשה';
   if (pathname.startsWith('/tasks/')) return 'משימה';
   if (pathname.startsWith('/people/')) return 'פרופיל';
-  const all = [...MAIN, ...ADMIN, { to: '/settings', label: 'הגדרות' }, { to: '/ops', label: 'מצב המערכת' }];
+  const all = [...MAIN, CALLS, ...ADMIN, { to: '/settings', label: 'הגדרות' }, { to: '/ops', label: 'מצב המערכת' }];
   return all.find((i) => pathname === i.to || pathname.startsWith(`${i.to}/`))?.label ?? '';
 }
 
@@ -83,6 +86,7 @@ export function Sidebar({ isManager, onNavigate }: { isManager: boolean; onNavig
   return (
     <nav className="sidebar" aria-label="תפריט ראשי">
       {MAIN.map(link)}
+      {isManager && link(CALLS)}
       {isManager && (
         <div className="side-group">
           <button type="button" className="side-group-head" aria-expanded={adminOpen} onClick={() => setAdminOpen((o) => !o)}>
