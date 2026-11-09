@@ -645,3 +645,75 @@ export interface SheetContactsDto {
   canManage: boolean;
   items: SheetContactDto[];
 }
+
+// ---------------- Campaigns ----------------
+
+/** Where an item shows in a campaign. */
+export const CAMPAIGN_SECTIONS = ['video', 'song', 'plan', 'file'] as const;
+export type CampaignSection = (typeof CAMPAIGN_SECTIONS)[number];
+/** Stored on the site (small files), in the uploader's Google Drive (large files), or a link. */
+export const CAMPAIGN_SOURCES = ['upload', 'drive', 'link'] as const;
+export type CampaignSource = (typeof CAMPAIGN_SOURCES)[number];
+/** Files stored on the site itself; larger ones go to Google Drive. */
+export const MAX_CAMPAIGN_FILE_BYTES = 3 * 1024 * 1024;
+
+export const campaignSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(5000).default(''),
+  startDate: isoDate.nullable().default(null),
+  endDate: isoDate.nullable().default(null),
+});
+const itemBase = {
+  section: z.enum(CAMPAIGN_SECTIONS),
+  title: z.string().trim().min(1).max(200),
+  note: z.string().trim().max(2000).default(''),
+};
+export const campaignItemSchema = z.discriminatedUnion('source', [
+  z.object({
+    ...itemBase,
+    source: z.literal('upload'),
+    fileName: z.string().trim().min(1).max(200),
+    mimeType: z.string().trim().min(1).max(120),
+    dataBase64: z.string().min(1).max(Math.ceil((MAX_CAMPAIGN_FILE_BYTES * 4) / 3) + 4),
+  }),
+  z.object({
+    ...itemBase,
+    source: z.literal('drive'),
+    driveFileId: z.string().regex(/^[\w-]{10,200}$/),
+    fileName: z.string().trim().min(1).max(200),
+    mimeType: z.string().trim().max(120).default('application/octet-stream'),
+    sizeBytes: z.number().int().min(0).max(1e12).nullable().default(null),
+  }),
+  z.object({ ...itemBase, source: z.literal('link'), url: z.url().max(2000).refine((u) => /^https?:\/\//i.test(u), 'Only http(s) links') }),
+]);
+export type CampaignItemInput = z.infer<typeof campaignItemSchema>;
+
+export interface CampaignItemDto {
+  id: string;
+  section: CampaignSection;
+  source: CampaignSource;
+  title: string;
+  note: string;
+  /** For links; for Drive files the Drive page; for uploads the download address on the site. */
+  url: string;
+  driveFileId: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  addedByPersonId: string;
+  createdAt: string;
+  canDelete: boolean;
+}
+export interface CampaignDto {
+  id: string;
+  name: string;
+  description: string;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+  counts: Record<CampaignSection, number>;
+}
+export interface CampaignDetailDto extends CampaignDto {
+  items: CampaignItemDto[];
+  canManage: boolean;
+}

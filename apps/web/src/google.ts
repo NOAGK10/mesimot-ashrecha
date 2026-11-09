@@ -77,3 +77,46 @@ export async function pickFromDrive(status: GoogleStatusDto, kind: PickKind): Pr
       .setVisible(true);
   });
 }
+
+/**
+ * Uploads a (large) file straight from the browser into the manager's Google Drive – it never passes
+ * through the site's server, so there is no size limit beyond Drive's – and makes it viewable by link,
+ * so the team can play it on the site. Uses the same short-lived token as the Picker.
+ */
+export async function uploadToDrive(file: File, onProgress: (fraction: number) => void): Promise<{ id: string }> {
+  const { accessToken } = await api<{ accessToken: string }>('GET', '/api/google/picker-token');
+  const type = file.type || 'application/octet-stream';
+  const init = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json; charset=UTF-8', 'x-upload-content-type': type },
+    body: JSON.stringify({ name: file.name, mimeType: type }),
+  });
+  const location = init.headers.get('location');
+  if (!init.ok || !location) throw new Error('drive_upload_start_failed');
+
+  const id = await new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', location);
+    xhr.setRequestHeader('content-type', type);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onload = () => {
+      try {
+        const body = JSON.parse(xhr.responseText) as { id?: string };
+        if (xhr.status >= 200 && xhr.status < 300 && body.id) resolve(body.id);
+        else reject(new Error('drive_upload_failed'));
+      } catch {
+        reject(new Error('drive_upload_failed'));
+      }
+    };
+    xhr.onerror = () => reject(new Error('drive_upload_failed'));
+    xhr.send(file);
+  });
+
+  const share = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/permissions`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+  });
+  if (!share.ok) throw new Error('drive_share_failed');
+  return { id };
+}

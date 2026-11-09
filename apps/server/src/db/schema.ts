@@ -18,6 +18,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   CALL_DIRECTIONS,
+  CAMPAIGN_SECTIONS,
+  CAMPAIGN_SOURCES,
   FINANCE_KINDS,
   CALL_STATUSES,
   CHAT_ATTACHMENT_KINDS,
@@ -587,3 +589,50 @@ export const contactCategoryMembers = pgTable(
   },
   (t) => [primaryKey({ columns: [t.categoryId, t.contactKey] })],
 );
+
+// ---------------- Campaigns ----------------
+
+export const campaignSection = pgEnum('campaign_section', CAMPAIGN_SECTIONS);
+export const campaignSource = pgEnum('campaign_source', CAMPAIGN_SOURCES);
+
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    startDate: date('start_date', { mode: 'string' }),
+    endDate: date('end_date', { mode: 'string' }),
+    createdByPersonId: uuid('created_by_person_id').references(() => people.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index('campaigns_org_idx').on(t.orgId, t.createdAt)],
+);
+
+/** Videos, songs, plans and files of a campaign. */
+export const campaignItems = pgTable(
+  'campaign_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
+    section: campaignSection('section').notNull(),
+    source: campaignSource('source').notNull(),
+    title: text('title').notNull(),
+    note: text('note').notNull().default(''),
+    url: text('url'),
+    driveFileId: text('drive_file_id'),
+    fileName: text('file_name'),
+    mimeType: text('mime_type'),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }),
+    addedByPersonId: uuid('added_by_person_id').notNull().references(() => people.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index('campaign_items_campaign_idx').on(t.campaignId, t.createdAt)],
+);
+
+/** The bytes of small files stored on the site, apart from the list so it stays light. */
+export const campaignFiles = pgTable('campaign_files', {
+  itemId: uuid('item_id').primaryKey().references(() => campaignItems.id, { onDelete: 'cascade' }),
+  dataBase64: text('data_base64').notNull(),
+});

@@ -302,7 +302,7 @@ function MembersDialog({ category, items, onClose }: { category: ContactCategory
   const allShownSelected = list.length > 0 && list.every((i) => selected.has(i.key));
 
   return (
-    <dialog ref={ref} className="task-dialog cc-dialog" onClose={onClose} onClick={(e) => e.target === ref.current && ref.current?.close()} aria-labelledby="cc-members-title">
+    <dialog ref={ref} className="task-dialog cc-dialog" onClose={onClose} onClick={(e) => e.target === ref.current && (ref.current?.close(), onClose())} aria-labelledby="cc-members-title">
       <form
         className="task-dialog-body"
         onSubmit={async (e) => {
@@ -312,7 +312,7 @@ function MembersDialog({ category, items, onClose }: { category: ContactCategory
           try {
             await api('PUT', `/api/contact-categories/${category.id}/members`, { keys: [...selected] });
             await qc.invalidateQueries({ queryKey: CFG.queryKey });
-            ref.current?.close();
+            (ref.current?.close(), onClose());
           } catch (err) {
             setError(err);
           } finally {
@@ -362,7 +362,7 @@ function MembersDialog({ category, items, onClose }: { category: ContactCategory
           <button type="submit" disabled={pending}>
             {pending ? 'שומר…' : 'שמירה'}
           </button>
-          <button type="button" className="link" onClick={() => ref.current?.close()}>
+          <button type="button" className="link" onClick={() => (ref.current?.close(), onClose())}>
             ביטול
           </button>
         </div>

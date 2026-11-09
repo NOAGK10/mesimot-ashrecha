@@ -90,7 +90,7 @@ export function NewTaskDialog({ date, onClose }: { date: string | null; onClose:
       ref={ref}
       className="task-dialog"
       onClose={onClose}
-      onClick={(e) => e.target === ref.current && ref.current?.close()}
+      onClick={(e) => e.target === ref.current && (ref.current?.close(), onClose())}
       aria-labelledby="new-task-title"
     >
       <form
@@ -162,7 +162,7 @@ export function NewTaskDialog({ date, onClose }: { date: string | null; onClose:
           <button type="submit" disabled={!title.trim() || !owner || pending}>
             {pending ? 'שומר…' : 'שמירה'}
           </button>
-          <button type="button" className="link" onClick={() => ref.current?.close()}>
+          <button type="button" className="link" onClick={() => (ref.current?.close(), onClose())}>
             ביטול
           </button>
         </div>

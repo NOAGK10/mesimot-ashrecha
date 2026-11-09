@@ -297,7 +297,7 @@ function ReportDialog({ kind, onClose }: { kind: FinanceKind; onClose: () => voi
     try {
       await api('POST', '/api/finance/entries', { kind, amountAgorot: agorot, description, personId, occurredOn });
       await qc.invalidateQueries({ queryKey: ['finance'] });
-      ref.current?.close();
+      (ref.current?.close(), onClose());
     } catch (e) {
       setError(e);
     } finally {
@@ -306,7 +306,7 @@ function ReportDialog({ kind, onClose }: { kind: FinanceKind; onClose: () => voi
   };
 
   return (
-    <dialog ref={ref} className="task-dialog" onClose={onClose} onClick={(e) => e.target === ref.current && ref.current?.close()} aria-labelledby="finance-report-title">
+    <dialog ref={ref} className="task-dialog" onClose={onClose} onClick={(e) => e.target === ref.current && (ref.current?.close(), onClose())} aria-labelledby="finance-report-title">
       <form
         className="task-dialog-body"
         onSubmit={(e) => {
@@ -339,7 +339,7 @@ function ReportDialog({ kind, onClose }: { kind: FinanceKind; onClose: () => voi
           <button type="submit" disabled={!valid || pending}>
             {pending ? 'שומר…' : 'דיווח'}
           </button>
-          <button type="button" className="link" onClick={() => ref.current?.close()}>
+          <button type="button" className="link" onClick={() => (ref.current?.close(), onClose())}>
             ביטול
           </button>
           {valid && (
