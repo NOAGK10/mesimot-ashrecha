@@ -706,3 +706,11 @@ button.danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--
 @media (max-width: 560px) { .task-dialog-row { grid-template-columns: 1fr 1fr; } .task-dialog-row > :last-child { grid-column: 1 / -1; } }
 .task-dialog .check-line, .task-dialog .switch { flex-direction: row; align-self: flex-start; align-items: center; width: auto; }
 .task-dialog .check-line input { width: 18px; flex: none; margin: 0; }
+
+/* "@" tagging in task details */
+.mention-box { position: relative; }
+.mention-box > textarea { width: 100%; }
+.mention-list.below { bottom: auto; top: calc(100% - 18px); margin: 0; }
+.mention-hint { display: block; color: var(--muted); font-size: 0.75rem; margin-top: 4px; padding-inline-start: 4px; }
+.field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+mark.mention { background: var(--accent-soft); color: var(--accent-strong); border-radius: 4px; padding: 0 2px; font-weight: 500; }

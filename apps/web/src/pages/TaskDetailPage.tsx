@@ -6,6 +6,7 @@ import { api, useApiMutation, useDocuments, useMe, useTask } from '../api';
 import { AddDocument, KIND_ICON, KIND_LABEL } from '../components/AddDocument';
 import { CategoryChip, CategorySelect } from '../components/Category';
 import { ChatPanel } from '../components/ChatPanel';
+import { MentionTextarea, TextWithMentions, useTagging } from '../components/MentionTextarea';
 import { ErrorText, PeopleChecklist, PersonSelect, PersonTag, StatusBadge, usePeopleMap } from '../components/common';
 import { EVENT_LABEL, STATUS_LABEL, formatDate, formatDateTime, transitionLabel } from '../he';
 
@@ -103,7 +104,11 @@ export function TaskDetailPage() {
             </>
           )}
         </dl>
-        {t.description && <p className="description">{t.description}</p>}
+        {t.description && (
+          <p className="description">
+            <TextWithMentions text={t.description} />
+          </p>
+        )}
         {statusNote && (
           <p className={`status-note status-${t.status}`}>
             <strong>{STATUS_LABEL[t.status]}:</strong> {statusNote.note}
@@ -289,6 +294,7 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
   const people = usePeopleMap();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
+  const tagging = useTagging();
   const [owner, setOwner] = useState(task.ownerPersonId);
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
   const [categoryId, setCategoryId] = useState(task.categoryId);
@@ -307,6 +313,7 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
       dueDate: dueDate || null,
       categoryId,
       visibility,
+      mentionIds: tagging.idsIn(description),
     });
     const next = participants.filter((p) => p !== owner);
     const same = next.length === task.participantIds.length && next.every((p) => task.participantIds.includes(p));
@@ -328,10 +335,10 @@ function EditTask({ task, onClose }: { task: TaskDetailDto; onClose: () => void 
         כותרת
         <input required value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
-      <label>
-        פרטים
-        <textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
-      </label>
+      <div className="field">
+        <span className="field-label">פרטים</span>
+        <MentionTextarea rows={4} value={description} onChange={setDescription} onTag={tagging.onTag} ariaLabel="פרטים" />
+      </div>
       <div className="row">
         {isManager && (
           <label>

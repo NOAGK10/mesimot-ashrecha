@@ -123,6 +123,8 @@ export interface SocialEmailInput {
   taskTitle: string | null;
   body: string;
   url: string;
+  /** Tagged in a task's details rather than in a chat. */
+  inTaskDetails?: boolean;
 }
 
 /** E-mail for being tagged in a chat or receiving feedback. */
@@ -131,7 +133,7 @@ export function buildSocialEmail(i: SocialEmailInput): MailMessage {
   const subject =
     i.kind === 'mention' ? `${i.orgName} · ${i.actorName} תייג אותך ${where}` : `${i.orgName} · ${i.actorName} כתב לך פידבק`;
   const intro = i.kind === 'mention' ? `${i.actorName} תייג אותך ${where}:` : `${i.actorName} כתב לך פידבק:`;
-  const button = i.kind === 'mention' ? 'לפתיחת השיחה' : 'לפרופיל שלך';
+  const button = i.inTaskDetails ? 'לפתיחת המשימה' : i.kind === 'mention' ? 'לפתיחת השיחה' : 'לפרופיל שלך';
   const quote = clip(i.body.trim(), 800);
 
   const text = [`שלום ${i.to.name},`, '', intro, '', quote, '', `${button}: ${i.url}`, '', 'בהצלחה,', i.orgName].join('\n');

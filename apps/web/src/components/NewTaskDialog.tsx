@@ -4,6 +4,7 @@ import type { RECURRENCE_FREQS, TaskDto } from '@org/shared';
 import { api, useMe } from '../api';
 import { ErrorText, PersonSelect, usePeopleMap } from './common';
 import { hebrewDay, hebrewMonthYear } from '../he';
+import { MentionTextarea, useTagging } from './MentionTextarea';
 
 type RecurrenceFreq = (typeof RECURRENCE_FREQS)[number];
 const FREQ_LABEL: Record<RecurrenceFreq, string> = { daily: 'כל יום', weekly: 'כל שבוע', monthly: 'כל חודש' };
@@ -36,6 +37,7 @@ export function NewTaskDialog({ date, onClose }: { date: string | null; onClose:
   const [done, setDone] = useState(false);
   const [repeat, setRepeat] = useState(false);
   const [freq, setFreq] = useState<RecurrenceFreq>('weekly');
+  const tagging = useTagging();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
@@ -71,6 +73,7 @@ export function NewTaskDialog({ date, onClose }: { date: string | null; onClose:
           dueTime: dueDate && dueTime ? dueTime : null,
           done,
           participantIds: [],
+          mentionIds: tagging.idsIn(description),
         });
       }
       await Promise.all([qc.invalidateQueries({ queryKey: ['tasks'] }), qc.invalidateQueries({ queryKey: ['recurrences'] })]);
@@ -104,10 +107,7 @@ export function NewTaskDialog({ date, onClose }: { date: string | null; onClose:
           <input required maxLength={300} value={title} onChange={(e) => setTitle(e.target.value)} placeholder=" " autoFocus />
           <span>כותרת</span>
         </label>
-        <label className="float-field">
-          <textarea rows={3} maxLength={20000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder=" " />
-          <span>פירוט</span>
-        </label>
+        <MentionTextarea value={description} onChange={setDescription} onTag={tagging.onTag} floatLabel="פירוט" />
 
         <div className="task-dialog-row">
           <label className="float-field has-value">

@@ -21,6 +21,7 @@ import { getOrg } from '../identity/org';
 import { policy } from '../identity/policy';
 import { actorOf, type Principal } from '../identity/principal';
 import { cancelPendingReminders, notifyAssigned, replanReminders } from '../notifications/scheduling';
+import { addInboxItems } from '../inbox/inbox-service';
 import { onOccurrenceCompleted } from '../recurrence/recurrence-service';
 import { assertTaskCategory } from './category-service';
 import { allowedTransitions, assertTransition, isOpen } from './lifecycle';
@@ -54,6 +55,27 @@ async function reload(tx: Db, id: string, now: Date): Promise<TaskDto> {
 
 const reminderTarget = (t: TaskWithParticipants) => ({ ...t, open: isOpen(t.status) && t.archivedAt === null });
 
+/** Tagged people must sign in to the site and be active members of the organisation. */
+async function assertTaggable(tx: Db, p: Principal, mentionIds: readonly string[]): Promise<string[]> {
+  const ids = [...new Set(mentionIds)].filter((pid) => pid !== p.personId);
+  if (ids.length === 0) return [];
+  const found = await tx
+    .select({ id: people.id })
+    .from(people)
+    .where(and(eq(people.orgId, p.orgId), inArray(people.id, ids), isNull(people.deactivatedAt), sql`${people.role} is not null`));
+  if (found.length !== ids.length) throw invalid('Only people who sign in to the site can be tagged');
+  return ids;
+}
+
+/** "X tagged you in the task …": on the home page and by e-mail. */
+async function notifyTagged(tx: Db, p: Principal, taskId: string, ids: readonly string[], now: Date) {
+  if (ids.length === 0) return;
+  await addInboxItems(
+    tx,
+    ids.map((personId) => ({ orgId: p.orgId, personId, kind: 'mention' as const, actorPersonId: p.personId, taskId, messageId: null, createdAt: now })),
+  );
+}
+
 export async function createTask(ctx: AppContext, p: Principal, input: z.output<typeof createTaskSchema>): Promise<TaskDto> {
   if (!policy.canCreateTask(p)) throw forbidden();
   if (!policy.canCreateTaskOwnedBy(p, input.ownerPersonId)) throw forbidden('You can create tasks only for yourself');
@@ -61,7 +83,10 @@ export async function createTask(ctx: AppContext, p: Principal, input: z.output<
   return ctx.db.transaction(async (tx) => {
     await assertActivePeople(tx, p.orgId, [input.ownerPersonId, ...input.participantIds]);
     await assertTaskCategory(tx, p.orgId, input.categoryId);
-    const { done, ...fields } = input;
+    const { done, mentionIds = [], ...fields } = input;
+    const tagged = await assertTaggable(tx, p, mentionIds);
+    // A private task is visible only to its people, so whoever is tagged in it joins it.
+    if (input.visibility === 'private') fields.participantIds = [...new Set([...fields.participantIds, ...tagged])];
     const task = (await insertTask(tx, { ...fields, status: done ? 'completed' : 'new', visibility: input.visibility ?? 'org', orgId: p.orgId, createdByPersonId: p.personId }, now))!;
     await recordAudit(tx, {
       orgId: p.orgId,
@@ -73,6 +98,7 @@ export async function createTask(ctx: AppContext, p: Principal, input: z.output<
     });
     await notifyAssigned(tx, task, [task.ownerPersonId, ...task.participantIds], p.personId, now);
     await replanReminders(tx, reminderTarget(task), now);
+    await notifyTagged(tx, p, task.id, tagged.filter((id) => id !== task.ownerPersonId && !task.participantIds.includes(id)), now);
     return toTaskDto(task, await today(tx, p.orgId, now));
   });
 }
@@ -123,7 +149,13 @@ export async function updateTask(ctx: AppContext, p: Principal, id: string, inpu
       await tx.delete(taskParticipants).where(and(eq(taskParticipants.taskId, id), eq(taskParticipants.personId, input.ownerPersonId)));
       await notifyAssigned(tx, task, [input.ownerPersonId], p.personId, now);
     }
-    if (Object.keys(patch).length === 0) return toTaskDto(task, await today(tx, p.orgId, now));
+    const tagged = await assertTaggable(tx, p, input.mentionIds ?? []);
+    const visibility = patch.visibility ?? task.visibility;
+    const owner = patch.ownerPersonId ?? task.ownerPersonId;
+    const joining = visibility === 'private' ? tagged.filter((pid) => pid !== owner && !task.participantIds.includes(pid)) : [];
+    if (joining.length) await tx.insert(taskParticipants).values(joining.map((personId) => ({ taskId: id, personId, addedAt: now })));
+    await notifyTagged(tx, p, id, tagged, now);
+    if (Object.keys(patch).length === 0 && joining.length === 0) return toTaskDto(task, await today(tx, p.orgId, now));
 
     await bump(tx, id, patch, now);
     const updated = (await loadTask(tx, id))!;

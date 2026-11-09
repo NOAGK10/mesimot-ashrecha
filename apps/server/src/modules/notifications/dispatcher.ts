@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { AppContext } from '../../context';
-import { auditEvents, chatMessages, notifications, people, personFeedback } from '../../db/schema';
+import { auditEvents, chatMessages, inboxItems, notifications, people, personFeedback } from '../../db/schema';
 import { todayIn } from '../../lib/dates';
 import { getOrg } from '../identity/org';
 import { issueMagicLink } from '../identity/auth-service';
@@ -105,6 +105,29 @@ async function buildSocialMessage(ctx: AppContext, n: NotificationRow): Promise<
   if (!person || person.deactivatedAt || person.role === null) return null;
   const org = await getOrg(ctx.db, n.orgId);
   const base = ctx.config.APP_URL;
+
+  if (n.kind === 'mention' && !n.messageId) {
+    if (!n.taskId) return null;
+    const task = await loadTask(ctx.db, n.taskId);
+    if (!task || task.archivedAt || task.deletedAt) return null;
+    const [inbox] = await ctx.db
+      .select({ actor: inboxItems.actorPersonId })
+      .from(inboxItems)
+      .where(and(eq(inboxItems.personId, n.personId), eq(inboxItems.taskId, n.taskId), eq(inboxItems.kind, 'mention'), isNull(inboxItems.messageId)))
+      .orderBy(desc(inboxItems.id))
+      .limit(1);
+    const [author] = inbox?.actor ? await ctx.db.select({ name: people.displayName }).from(people).where(eq(people.id, inbox.actor)) : [];
+    return buildSocialEmail({
+      kind: 'mention',
+      orgName: org.name,
+      to: { name: person.displayName, email: person.email },
+      actorName: author?.name ?? 'מישהו',
+      taskTitle: task.title,
+      body: task.description,
+      url: `${base}/tasks/${task.id}`,
+      inTaskDetails: true,
+    });
+  }
 
   if (n.kind === 'mention') {
     if (!n.messageId) return null;

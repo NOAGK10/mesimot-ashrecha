@@ -60,7 +60,7 @@ export async function listInbox(ctx: AppContext, p: Principal, limit = 50): Prom
       item: inboxItems,
       taskTitle: tasks.title,
       taskDueDate: tasks.dueDate,
-      body: sql<string | null>`coalesce(${chatMessages.body}, ${personFeedback.body})`,
+      body: sql<string | null>`coalesce(${chatMessages.body}, ${personFeedback.body}, case when ${inboxItems.kind} = 'mention' and ${inboxItems.messageId} is null then ${tasks.description} end)`,
       deletedAt: sql<Date | null>`coalesce(${chatMessages.deletedAt}, ${personFeedback.deletedAt})`,
     })
     .from(inboxItems)

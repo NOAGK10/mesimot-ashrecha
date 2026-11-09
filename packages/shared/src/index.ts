@@ -52,6 +52,8 @@ export const createTaskSchema = z.object({
   categoryId: uuid.nullable().optional(),
   /** Created already done (e.g. logging something that was handled). */
   done: z.boolean().optional(),
+  /** People tagged with "@" in the details; each gets a notification. */
+  mentionIds: z.array(uuid).max(50).optional(),
   /** Absent = 'org'. */
   visibility: z.enum(TASK_VISIBILITIES).optional(),
 });
@@ -64,6 +66,8 @@ export const updateTaskSchema = z.object({
   dueTime: dueTime.nullable().optional(),
   categoryId: uuid.nullable().optional(),
   visibility: z.enum(TASK_VISIBILITIES).optional(),
+  /** People newly tagged with "@" in the details; each gets a notification. */
+  mentionIds: z.array(uuid).max(50).optional(),
 });
 export const changeStatusSchema = z.object({
   version: z.number().int().positive(),

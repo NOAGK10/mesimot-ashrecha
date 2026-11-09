@@ -31,7 +31,7 @@ export function HomePage() {
       void qc.invalidateQueries({ queryKey: ['inbox'] });
     }
     if (i.kind === 'feedback') navigate(`/people/${me.data?.personId}#feedback`);
-    else if (i.kind === 'mention') navigate(i.taskId ? `/tasks/${i.taskId}#m${i.messageId}` : `/chat#m${i.messageId}`);
+    else if (i.kind === 'mention') navigate(i.taskId ? (i.messageId ? `/tasks/${i.taskId}#m${i.messageId}` : `/tasks/${i.taskId}`) : `/chat#m${i.messageId}`);
     else navigate(`/tasks/${i.taskId}`);
   };
   const readAll = async () => {
