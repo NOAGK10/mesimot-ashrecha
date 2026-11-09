@@ -21,6 +21,7 @@ import { BoardPage } from './pages/BoardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PrivacyPage, TermsPage } from './pages/LegalPages';
 import { Icon, Sidebar, pageTitle } from './components/Sidebar';
+import { CalendarView } from './components/CalendarView';
 
 export function App() {
   const me = useMe();
@@ -112,17 +113,31 @@ export function App() {
 function TasksHome() {
   const [params, setParams] = useSearchParams();
   const scope = params.get('scope') === 'org' ? 'all' : 'mine';
+  const calendar = params.get('view') === 'calendar';
+  const go = (next: { scope?: 'org'; view?: 'calendar' }) => setParams(Object.fromEntries(Object.entries(next).filter(([, v]) => v)) as Record<string, string>);
+  const scopeParam = scope === 'all' ? ('org' as const) : undefined;
+  const viewParam = calendar ? ('calendar' as const) : undefined;
   return (
     <>
-      <div className="segmented" role="tablist">
-        <button role="tab" aria-selected={scope === 'mine'} className={scope === 'mine' ? 'active' : ''} onClick={() => setParams({})}>
-          המשימות שלי
-        </button>
-        <button role="tab" aria-selected={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setParams({ scope: 'org' })}>
-          משימות הארגון
-        </button>
+      <div className="tasks-switches">
+        <div className="segmented" role="tablist">
+          <button role="tab" aria-selected={scope === 'mine'} className={scope === 'mine' ? 'active' : ''} onClick={() => go({ view: viewParam })}>
+            המשימות שלי
+          </button>
+          <button role="tab" aria-selected={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => go({ scope: 'org', view: viewParam })}>
+            משימות הארגון
+          </button>
+        </div>
+        <div className="segmented" role="group" aria-label="תצוגה">
+          <button type="button" aria-pressed={!calendar} className={!calendar ? 'active' : ''} onClick={() => go({ scope: scopeParam })}>
+            רשימה
+          </button>
+          <button type="button" aria-pressed={calendar} className={calendar ? 'active' : ''} onClick={() => go({ scope: scopeParam, view: 'calendar' })}>
+            לוח שנה
+          </button>
+        </div>
       </div>
-      <TasksPage key={scope} scope={scope} />
+      {calendar ? <CalendarView key={scope} mine={scope === 'mine'} /> : <TasksPage key={scope} scope={scope} />}
     </>
   );
 }

@@ -2,7 +2,9 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useQueryClient } from '@tanstack/react-query';
 import type { MessageDto, PersonDto } from '@org/shared';
 import { api, useMe } from '../api';
-import { formatDateTime } from '../he';
+import { chatDayLabel, clockTime } from '../he';
+import { Avatar } from './Avatar';
+import { Icon } from './Sidebar';
 import { ErrorText, PersonTag, usePeopleMap } from './common';
 
 const POLL_MS = 5000;
@@ -14,7 +16,7 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * New messages arrive by polling every few seconds while the page is visible.
  * Typing "@" opens a list of people; tagged people get a notification on their home page.
  */
-export function ChatPanel({ taskId, privateTo }: { taskId?: string; privateTo?: string[] }) {
+export function ChatPanel({ taskId, privateTo, fill = false }: { taskId?: string; privateTo?: string[]; fill?: boolean }) {
   const me = useMe();
   const people = usePeopleMap();
   const qc = useQueryClient();
@@ -98,6 +100,7 @@ export function ChatPanel({ taskId, privateTo }: { taskId?: string; privateTo?: 
     stickToBottom.current = true;
     merge([m]);
     void qc.invalidateQueries({ queryKey: ['recent-chat'] });
+    void qc.invalidateQueries({ queryKey: ['chat-channels'] });
   };
 
   // Who can be tagged: people who sign in; in a private task only the people on it and managers.
@@ -110,7 +113,7 @@ export function ChatPanel({ taskId, privateTo }: { taskId?: string; privateTo?: 
   );
 
   return (
-    <div className="chat">
+    <div className={`chat${fill ? ' chat-fill' : ''}`}>
       <div
         className="chat-list"
         ref={listRef}
@@ -125,20 +128,45 @@ export function ChatPanel({ taskId, privateTo }: { taskId?: string; privateTo?: 
           </button>
         )}
         {messages.length === 0 && <p className="muted small chat-empty">{taskId ? 'עוד אין הודעות על המשימה הזו.' : 'עוד אין הודעות. אפשר להתחיל!'}</p>}
-        {messages.map((m) => (
-          <div key={m.id} id={`m${m.id}`} className={`chat-msg${m.authorPersonId === me.data?.personId ? ' mine' : ''}`}>
-            <div className="chat-meta">
-              <PersonTag id={m.authorPersonId} avatarFor={m.authorPersonId} name={people.name(m.authorPersonId)} jobTitle={people.jobTitle(m.authorPersonId)} />
-              <span className="muted small">{formatDateTime(m.createdAt)}</span>
-              {m.canDelete && (
-                <button className="link small danger-text" onClick={() => remove(m)} aria-label="מחיקת ההודעה">
-                  מחיקה
-                </button>
+        {messages.map((m, i) => {
+          const prev = messages[i - 1];
+          const day = new Date(m.createdAt).toDateString();
+          const newDay = !prev || new Date(prev.createdAt).toDateString() !== day;
+          // Consecutive messages from the same person on the same day share one picture and name.
+          const continued = !newDay && prev?.authorPersonId === m.authorPersonId;
+          const mine = m.authorPersonId === me.data?.personId;
+          return (
+            <Fragment key={m.id}>
+              {newDay && (
+                <div className="chat-day">
+                  <span>{chatDayLabel(m.createdAt)}</span>
+                </div>
               )}
-            </div>
-            {m.deleted ? <p className="muted small">ההודעה נמחקה</p> : <MessageBody body={m.body} mentioned={m.mentionIds.map((id) => people.name(id))} />}
-          </div>
-        ))}
+              <div id={`m${m.id}`} className={`chat-row${mine ? ' mine' : ''}${continued ? ' continued' : ''}`}>
+                {!mine && (
+                  <span className="chat-avatar">{!continued && <Avatar personId={m.authorPersonId} name={people.name(m.authorPersonId)} size={32} />}</span>
+                )}
+                <div className="chat-bubble">
+                  {!mine && !continued && (
+                    <div className="chat-author">
+                      {people.name(m.authorPersonId)}
+                      {people.jobTitle(m.authorPersonId) && <span className="chat-job"> · {people.jobTitle(m.authorPersonId)}</span>}
+                    </div>
+                  )}
+                  {m.deleted ? <p className="chat-body muted">ההודעה נמחקה</p> : <MessageBody body={m.body} mentioned={m.mentionIds.map((id) => people.name(id))} />}
+                  <div className="chat-foot">
+                    {m.canDelete && (
+                      <button className="link chat-delete" onClick={() => remove(m)} aria-label="מחיקת ההודעה">
+                        מחיקה
+                      </button>
+                    )}
+                    <span className="chat-time">{clockTime(m.createdAt)}</span>
+                  </div>
+                </div>
+              </div>
+            </Fragment>
+          );
+        })}
       </div>
       <Composer candidates={candidates} onSend={send} />
       <ErrorText error={error} />
@@ -222,32 +250,35 @@ function Composer({ candidates, onSend }: { candidates: PersonDto[]; onSend: (bo
           ))}
         </ul>
       )}
-      <textarea
-        ref={ref}
-        rows={2}
-        maxLength={4000}
-        value={text}
-        placeholder="כתיבת הודעה… (@ כדי לתייג, Enter לשליחה, Shift+Enter לשורה חדשה)"
-        onChange={(e) => {
-          setText(e.target.value);
-          updateQuery(e.target.value, e.target.selectionStart);
-        }}
-        onKeyDown={(e) => {
-          if (matches.length > 0) {
-            if (e.key === 'ArrowDown') return e.preventDefault(), setActive((active + 1) % matches.length);
-            if (e.key === 'ArrowUp') return e.preventDefault(), setActive((active - 1 + matches.length) % matches.length);
-            if (e.key === 'Enter' || e.key === 'Tab') return e.preventDefault(), pick(matches[active]!);
-            if (e.key === 'Escape') return setQuery(null);
-          }
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            void submit();
-          }
-        }}
-      />
-      <button onClick={submit} disabled={sending || !text.trim()}>
-        שליחה
-      </button>
+      <div className="chat-input">
+        <textarea
+          ref={ref}
+          rows={1}
+          maxLength={4000}
+          value={text}
+          placeholder="כתבו הודעה…"
+          onChange={(e) => {
+            setText(e.target.value);
+            updateQuery(e.target.value, e.target.selectionStart);
+          }}
+          onKeyDown={(e) => {
+            if (matches.length > 0) {
+              if (e.key === 'ArrowDown') return e.preventDefault(), setActive((active + 1) % matches.length);
+              if (e.key === 'ArrowUp') return e.preventDefault(), setActive((active - 1 + matches.length) % matches.length);
+              if (e.key === 'Enter' || e.key === 'Tab') return e.preventDefault(), pick(matches[active]!);
+              if (e.key === 'Escape') return setQuery(null);
+            }
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              void submit();
+            }
+          }}
+        />
+        <button type="button" className="chat-send" onClick={submit} disabled={sending || !text.trim()} aria-label="שליחה" title="שליחה">
+          <Icon name="send" size={20} />
+        </button>
+      </div>
+      <p className="chat-hint">Enter לשליחה · Shift+Enter לשורה חדשה · @ לתיוג</p>
       <ErrorText error={error} />
     </div>
   );

@@ -255,6 +255,13 @@ export interface MessageDto {
   canDelete: boolean;
 }
 
+/** One conversation in the chat sidebar: the general channel (taskId null) or a task's conversation. */
+export interface ChatChannelDto {
+  taskId: string | null;
+  title: string;
+  last: { authorPersonId: string; body: string; createdAt: string; deleted: boolean } | null;
+}
+
 export const INBOX_KINDS = ['mention', 'task_assigned', 'feedback'] as const;
 export type InboxKind = (typeof INBOX_KINDS)[number];
 export interface InboxItemDto {

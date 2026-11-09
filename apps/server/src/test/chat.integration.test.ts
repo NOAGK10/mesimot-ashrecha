@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { deleteMessage, listMessages, postMessage } from '../modules/chat/chat-service';
+import { deleteMessage, listChannels, listMessages, postMessage } from '../modules/chat/chat-service';
 import { listInbox, markRead, unreadCount } from '../modules/inbox/inbox-service';
 import { createTask, setParticipants } from '../modules/tasks/task-service';
 import { createHarness, type Harness } from './harness';
@@ -103,5 +103,23 @@ describe('assignment notifications on the home page', () => {
     expect((await listInbox(h.ctx, h.principal(h.contactId))).some((i) => i.taskId === t.id)).toBe(false);
     await markRead(h.ctx, h.partner, { all: true });
     expect(await unreadCount(h.ctx, h.partner)).toBe(0);
+  });
+});
+
+describe('conversation list', () => {
+  it('lists the general chat and task conversations, newest first, hiding private tasks from outsiders', async () => {
+    const open = await createTask(h.ctx, h.manager, { title: 'שיחה פתוחה', description: '', ownerPersonId: h.member.personId, dueDate: null, participantIds: [] });
+    const secret = await createTask(h.ctx, h.manager, { title: 'שיחה סודית', description: '', ownerPersonId: h.manager.personId, dueDate: null, participantIds: [], visibility: 'private' });
+    await postMessage(h.ctx, h.manager, { taskId: open.id, mentionIds: [], body: 'על המשימה' });
+    await postMessage(h.ctx, h.manager, { taskId: secret.id, mentionIds: [], body: 'סוד' });
+
+    const forManager = await listChannels(h.ctx, h.manager);
+    expect(forManager[0]).toMatchObject({ taskId: secret.id, title: 'שיחה סודית', last: { body: 'סוד', authorPersonId: h.manager.personId } });
+    expect(forManager.map((c) => c.taskId)).toEqual(expect.arrayContaining([null, open.id, secret.id]));
+
+    const forGuest = await listChannels(h.ctx, h.guest);
+    expect(forGuest.map((c) => c.taskId)).toContain(open.id);
+    expect(forGuest.map((c) => c.taskId)).not.toContain(secret.id);
+    expect(forGuest.find((c) => c.taskId === null)?.title).toBe("צ'אט כללי");
   });
 });

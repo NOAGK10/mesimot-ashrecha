@@ -5,9 +5,10 @@ import type { AppContext } from '../../context';
 import { requirePrincipal } from '../../http';
 import { parse } from '../../lib/validate';
 import { listInbox, markRead, unreadCount } from '../inbox/inbox-service';
-import { deleteMessage, listMessages, postMessage } from './chat-service';
+import { deleteMessage, listChannels, listMessages, postMessage } from './chat-service';
 
 export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
+  app.get('/api/chat/channels', async (req) => listChannels(ctx, requirePrincipal(req)));
   app.get('/api/chat/messages', async (req) => listMessages(ctx, requirePrincipal(req), parse(listMessagesQuerySchema, req.query)));
   app.post('/api/chat/messages', async (req, reply) => {
     const message = await postMessage(ctx, requirePrincipal(req), parse(postMessageSchema, req.body));

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import type { z } from 'zod';
-import type { MessageDto, listMessagesQuerySchema, postMessageSchema } from '@org/shared';
+import type { ChatChannelDto, MessageDto, listMessagesQuerySchema, postMessageSchema } from '@org/shared';
 import type { AppContext } from '../../context';
 import type { Db } from '../../db/client';
 import { chatMentions, chatMessages, people } from '../../db/schema';
@@ -64,6 +64,39 @@ export async function listMessages(ctx: AppContext, p: Principal, q: z.output<ty
     .limit(q.limit);
   if (q.after === undefined) rows.reverse();
   return withMentions(ctx.db, p, rows);
+}
+
+/**
+ * Conversations for the chat sidebar, most recent first: the general channel (always listed)
+ * and every task conversation that has messages and that the caller may see.
+ */
+export async function listChannels(ctx: AppContext, p: Principal): Promise<ChatChannelDto[]> {
+  await openChannel(ctx.db, p, null);
+  const latest = await ctx.db
+    .select({ id: sql<number>`max(${chatMessages.id})`.mapWith(Number) })
+    .from(chatMessages)
+    .where(eq(chatMessages.orgId, p.orgId))
+    .groupBy(chatMessages.taskId);
+  const ids = latest.map((l) => l.id);
+  const rows = ids.length ? await ctx.db.select().from(chatMessages).where(inArray(chatMessages.id, ids)) : [];
+  const last = (m: MessageRow) => ({
+    authorPersonId: m.authorPersonId,
+    body: m.deletedAt ? '' : m.body,
+    createdAt: m.createdAt.toISOString(),
+    deleted: m.deletedAt !== null,
+  });
+
+  const general = rows.find((r) => r.taskId === null);
+  const channels: (ChatChannelDto & { at: number })[] = [
+    { taskId: null, title: "צ'אט כללי", last: general ? last(general) : null, at: general?.id ?? Number.MAX_SAFE_INTEGER },
+  ];
+  for (const r of rows) {
+    if (!r.taskId) continue;
+    const task = await loadTask(ctx.db, r.taskId);
+    if (!task || task.deletedAt || !policy.canViewTask(p, task)) continue;
+    channels.push({ taskId: task.id, title: task.title, last: last(r), at: r.id });
+  }
+  return channels.sort((a, b) => b.at - a.at).map(({ at: _at, ...c }) => c);
 }
 
 /** Who may be tagged: people who can sign in and can see the channel. */
