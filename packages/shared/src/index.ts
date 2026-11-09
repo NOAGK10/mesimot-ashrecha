@@ -717,3 +717,21 @@ export interface CampaignDetailDto extends CampaignDto {
   items: CampaignItemDto[];
   canManage: boolean;
 }
+
+// ---------------- Distribution points (from a Google Sheet) ----------------
+
+export interface DistributionPointDto {
+  id: string;
+  name: string;
+  phone: string;
+  city: string;
+  notes: string;
+}
+export interface DistributionPointsDto {
+  sheetUrl: string | null;
+  syncedAt: string | null;
+  syncError: string | null;
+  unmatchedColumns: string[];
+  canManage: boolean;
+  items: DistributionPointDto[];
+}

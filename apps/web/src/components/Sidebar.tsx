@@ -33,6 +33,7 @@ const ICONS = {
   contacts: 'M20 0H4v2h16V0zM4 24h16v-2H4v2zM20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 2.75c1.24 0 2.25 1.01 2.25 2.25s-1.01 2.25-2.25 2.25S9.75 10.24 9.75 9 10.76 6.75 12 6.75zM17 17H7v-1.5c0-1.67 3.33-2.5 5-2.5s5 .83 5 2.5V17z',
   institution: 'M4 10h3v7H4zM10.5 10h3v7h-3zM2 19h20v3H2zM17 10h3v7h-3zM12 1 2 6v2h20V6z',
   campaign: 'M18 11v2h4v-2h-4zm-2 6.61c.96.71 2.21 1.65 3.2 2.39.4-.53.8-1.07 1.2-1.6-.99-.74-2.24-1.68-3.2-2.4-.4.54-.8 1.08-1.2 1.61zM20.4 5.6c-.4-.53-.8-1.07-1.2-1.6-.99.74-2.24 1.68-3.2 2.4.4.53.8 1.07 1.2 1.6.96-.72 2.21-1.65 3.2-2.4zM4 9c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h1v4h2v-4h1l5 3V6L8 9H4zm11.5 3c0-1.33-.58-2.53-1.5-3.35v6.69c.92-.81 1.5-2.01 1.5-3.34z',
+  distribution: 'M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9 1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
   chevron: 'M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z',
 } as const;
 
@@ -59,6 +60,7 @@ const CALLS: Item = { to: '/calls', label: 'שיחות', icon: 'phone' };
 /** Managers and members (not guests). */
 const INSTITUTIONS: Item = { to: '/institutions', label: 'מוסדות', icon: 'institution' };
 const CAMPAIGNS: Item = { to: '/campaigns', label: 'קמפיינים', icon: 'campaign' };
+const DISTRIBUTION: Item = { to: '/distribution', label: 'מוקדי חלוקה', icon: 'distribution' };
 /** Managers only. */
 const FINANCE: Item = { to: '/finance', label: 'ניהול כספים', icon: 'money' };
 const ADMIN: Item[] = [
@@ -73,7 +75,7 @@ export function pageTitle(pathname: string): string {
   if (pathname.startsWith('/tasks/new')) return 'משימה חדשה';
   if (pathname.startsWith('/tasks/')) return 'משימה';
   if (pathname.startsWith('/people/')) return 'פרופיל';
-  const all = [...MAIN, INSTITUTIONS, CAMPAIGNS, CALLS, FINANCE, ...ADMIN, { to: '/settings', label: 'הגדרות' }, { to: '/ops', label: 'מצב המערכת' }];
+  const all = [...MAIN, INSTITUTIONS, DISTRIBUTION, CAMPAIGNS, CALLS, FINANCE, ...ADMIN, { to: '/settings', label: 'הגדרות' }, { to: '/ops', label: 'מצב המערכת' }];
   return all.find((i) => pathname === i.to || pathname.startsWith(`${i.to}/`))?.label ?? '';
 }
 
@@ -97,6 +99,7 @@ export function Sidebar({ isManager, isTeam, onNavigate }: { isManager: boolean;
     <nav className="sidebar" aria-label="תפריט ראשי">
       {MAIN.map(link)}
       {isTeam && link(INSTITUTIONS)}
+      {isTeam && link(DISTRIBUTION)}
       {isTeam && link(CAMPAIGNS)}
       {isManager && link(FINANCE)}
       {isManager && link(CALLS)}

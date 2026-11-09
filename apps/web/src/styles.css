@@ -870,3 +870,8 @@ a.inst-line:hover, .inst-contact a:hover { color: var(--accent); }
 [dir="rtl"] .upload-progress > div, .upload-progress > div { inset-inline-start: 0; left: auto; }
 .upload-progress span { position: relative; display: block; text-align: center; font-size: 0.82rem; line-height: 26px; }
 @media (max-width: 560px) { .campaign-items.s-video { grid-template-columns: 1fr; } }
+
+/* Distribution points */
+.inst-card.has-notes { border-inline-start: 4px solid #e05a2b; }
+.dp-notes { margin: 2px 0 0; display: flex; flex-direction: column; gap: 2px; background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: 0.9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.inst-bar .check-line { white-space: nowrap; }

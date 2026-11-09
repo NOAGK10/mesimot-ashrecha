@@ -19,6 +19,7 @@ import { ContactsPage } from './pages/ContactsPage';
 import { InstitutionsPage } from './pages/InstitutionsPage';
 import { CampaignsPage } from './pages/CampaignsPage';
 import { CampaignPage } from './pages/CampaignPage';
+import { DistributionPage } from './pages/DistributionPage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage, useInbox } from './pages/HomePage';
 import { Avatar } from './components/Avatar';
@@ -114,6 +115,7 @@ export function App() {
           <Route path="/contacts" element={<ContactsPage />} />
           {canCreate && <Route path="/institutions" element={<InstitutionsPage />} />}
           {canCreate && <Route path="/campaigns" element={<CampaignsPage />} />}
+          {canCreate && <Route path="/distribution" element={<DistributionPage />} />}
           {canCreate && <Route path="/campaigns/:id" element={<CampaignPage />} />}
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

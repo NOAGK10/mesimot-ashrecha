@@ -8,6 +8,8 @@ import {
   sheetContacts,
   contactCategories,
   campaigns,
+  distributionPoints,
+  sheetSources,
   organizations,
   chatReads,
   documentCategories,
@@ -82,6 +84,8 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
     await tx.delete(sheetContacts).where(eq(sheetContacts.orgId, org));
     await tx.delete(contactCategories).where(eq(contactCategories.orgId, org)); // members cascade
     await tx.delete(campaigns).where(eq(campaigns.orgId, org)); // items and stored files cascade
+    await tx.delete(distributionPoints).where(eq(distributionPoints.orgId, org));
+    await tx.delete(sheetSources).where(eq(sheetSources.orgId, org));
     await tx
       .update(organizations)
       .set({

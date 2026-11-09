@@ -636,3 +636,36 @@ export const campaignFiles = pgTable('campaign_files', {
   itemId: uuid('item_id').primaryKey().references(() => campaignItems.id, { onDelete: 'cascade' }),
   dataBase64: text('data_base64').notNull(),
 });
+
+// ---------------- Lists read from Google Sheets (generic source) ----------------
+
+/** Which Google Sheet a list is read from, per organisation and kind of list. */
+export const sheetSources = pgTable(
+  'sheet_sources',
+  {
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    kind: text('kind').notNull(),
+    sheetId: text('sheet_id').notNull(),
+    /** The manager who connected it; their Google connection is used to read a private sheet. */
+    byPersonId: uuid('by_person_id'),
+    syncedAt: ts('synced_at'),
+    syncError: text('sync_error'),
+    unmatched: jsonb('unmatched').$type<string[]>(),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.kind] })],
+);
+
+/** Distribution points, copied from the organisation's Google Sheet; replaced on every update from it. */
+export const distributionPoints = pgTable(
+  'distribution_points',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    position: integer('position').notNull(),
+    name: text('name').notNull(),
+    phone: text('phone').notNull().default(''),
+    city: text('city').notNull().default(''),
+    notes: text('notes').notNull().default(''),
+  },
+  (t) => [index('distribution_points_org_idx').on(t.orgId, t.position)],
+);
