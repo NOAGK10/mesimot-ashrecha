@@ -8,6 +8,7 @@ import type { AppContext } from './context';
 import { attachPrincipal, requirePrincipal } from './http';
 import { AppError, forbidden } from './lib/errors';
 import { callRoutes } from './modules/calls/routes';
+import { financeRoutes } from './modules/finance/routes';
 import { chatRoutes } from './modules/chat/routes';
 import { profileRoutes } from './modules/profiles/routes';
 import { documentRoutes } from './modules/documents/routes';
@@ -72,6 +73,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions): Promise<Fasti
   profileRoutes(app, ctx);
   adminRoutes(app, ctx);
   callRoutes(app, ctx);
+  financeRoutes(app, ctx);
 
   // Wake-up call from the external scheduler (free hosting sleeps, so the in-process loop is not enough).
   const cronSecret = ctx.config.CRON_SECRET;

@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   CALL_DIRECTIONS,
+  FINANCE_KINDS,
   CALL_STATUSES,
   CHAT_ATTACHMENT_KINDS,
   DOCUMENT_KINDS,
@@ -53,6 +54,8 @@ export const organizations = pgTable('organizations', {
   reminderHour: smallint('reminder_hour').notNull().default(9),
   /** How many days before the due date the "due soon" reminder goes out. */
   dueSoonDays: smallint('due_soon_days').notNull().default(1),
+  /** The organisation's money before the first finance report, in agorot. */
+  financeOpeningAgorot: bigint('finance_opening_agorot', { mode: 'number' }).notNull().default(0),
   createdAt: createdAt(),
 });
 
@@ -483,4 +486,27 @@ export const calls = pgTable(
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },
   (t) => [index('calls_owner_idx').on(t.ownerPersonId, t.occurredAt)],
+);
+
+// ---------------- Finance ----------------
+
+export const financeKind = pgEnum('finance_kind', FINANCE_KINDS);
+
+/** One income or expense report. Deleting keeps the row (deletedAt) so the history stays honest. */
+export const financeEntries = pgTable(
+  'finance_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    kind: financeKind('kind').notNull(),
+    amountAgorot: bigint('amount_agorot', { mode: 'number' }).notNull(),
+    description: text('description').notNull(),
+    personId: uuid('person_id').notNull().references(() => people.id),
+    occurredOn: date('occurred_on', { mode: 'string' }).notNull(),
+    reportedByPersonId: uuid('reported_by_person_id').notNull().references(() => people.id),
+    createdAt: createdAt(),
+    deletedAt: ts('deleted_at'),
+    deletedByPersonId: uuid('deleted_by_person_id').references(() => people.id),
+  },
+  (t) => [index('finance_entries_org_idx').on(t.orgId, t.occurredOn), check('finance_amount_positive', sql`${t.amountAgorot} > 0`)],
 );

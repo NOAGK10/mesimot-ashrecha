@@ -3,6 +3,8 @@ import type { AppContext } from '../../context';
 import {
   auditEvents,
   calls,
+  financeEntries,
+  organizations,
   chatReads,
   documentCategories,
   documents,
@@ -31,6 +33,7 @@ export interface ResetResult {
   documents: number;
   feedback: number;
   calls: number;
+  financeEntries: number;
   people: number;
 }
 
@@ -68,6 +71,8 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
     await tx.delete(documentCategories).where(eq(documentCategories.orgId, org));
 
     const deletedCalls = await tx.delete(calls).where(eq(calls.orgId, org)).returning({ id: calls.id });
+    const deletedFinance = await tx.delete(financeEntries).where(eq(financeEntries.orgId, org)).returning({ id: financeEntries.id });
+    await tx.update(organizations).set({ financeOpeningAgorot: 0 }).where(eq(organizations.id, org));
 
     // Profiles: feedback (its notifications and inbox items cascade) and "responsible for".
     const deletedFeedback = await tx.delete(personFeedback).where(eq(personFeedback.orgId, org)).returning({ id: personFeedback.id });
@@ -94,6 +99,7 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
       documents: deletedDocs.length,
       feedback: deletedFeedback.length,
       calls: deletedCalls.length,
+      financeEntries: deletedFinance.length,
       people: otherIds.length,
     };
     await recordAudit(tx, { orgId: org, entityType: 'organization', entityId: org, type: 'org.content_reset', actor: actorOf(p), data: { ...result } });

@@ -539,3 +539,43 @@ export interface CallDto {
   occurredAt: string;
   updatedAt: string;
 }
+
+// ---------------- Finance ----------------
+
+/** Money in and out of the organisation. Amounts are whole agorot (1 ₪ = 100) to avoid rounding errors. */
+export const FINANCE_KINDS = ['income', 'expense'] as const;
+export type FinanceKind = (typeof FINANCE_KINDS)[number];
+
+export const financeEntrySchema = z.object({
+  kind: z.enum(FINANCE_KINDS),
+  amountAgorot: z.number().int().positive().max(100_000_000_00),
+  description: z.string().trim().min(1).max(2000),
+  /** Who spent or received the money. */
+  personId: z.uuid(),
+  occurredOn: isoDate,
+});
+export type FinanceEntryInput = z.infer<typeof financeEntrySchema>;
+export const financeOpeningSchema = z.object({ amountAgorot: z.number().int().min(-100_000_000_00).max(100_000_000_00) });
+
+export interface FinanceEntryDto {
+  id: string;
+  kind: FinanceKind;
+  amountAgorot: number;
+  description: string;
+  personId: string;
+  personName: string;
+  occurredOn: string;
+  reportedByPersonId: string;
+  createdAt: string;
+  canDelete: boolean;
+}
+export interface FinanceSummaryDto {
+  /** The money the organisation had before the first report. */
+  openingAgorot: number;
+  incomeAgorot: number;
+  expenseAgorot: number;
+  /** opening + income − expense */
+  balanceAgorot: number;
+  canSetOpening: boolean;
+  entries: FinanceEntryDto[];
+}
