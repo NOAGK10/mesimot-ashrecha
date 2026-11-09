@@ -368,6 +368,8 @@ export const updateProfileSchema = z.object({
   avatarColor: hexColor.nullable().optional(),
   /** What this person is responsible for in the organisation, in their own words. */
   responsibilities: z.string().trim().max(2000).nullable().optional(),
+  /** Shown to everyone in the contacts tab. */
+  phone: z.string().trim().max(30).regex(/^[\d\s+()*#-]*$/, 'Invalid phone').nullable().optional(),
 });
 /** A square image, already resized in the browser, as a data URL. */
 export const uploadAvatarSchema = z.object({ dataUrl: z.string().max(500_000) });
@@ -436,6 +438,8 @@ export interface PersonDto {
   /** Cache-busting version of the uploaded photo, or null when there is none. */
   avatarVersion: number | null;
   responsibilities: string | null;
+  /** Filled in by the person (or a manager); null when not given. */
+  phone: string | null;
 }
 export interface TaskDto {
   id: string;

@@ -103,7 +103,7 @@ export async function getProfile(ctx: AppContext, p: Principal, id: string): Pro
   requireSignedIn(p);
   const { person, avatarAt } = await loadPerson(ctx, p, id);
   return {
-    person: toPersonDto(person, policy.canManagePeople(p) || p.personId === id, avatarAt),
+    person: toPersonDto(person, policy.canSeeEmails(p) || p.personId === id, avatarAt),
     score: await performanceScore(ctx, p.orgId, id),
     feedback: await listFeedback(ctx, p, id),
     canEditProfile: canEditProfile(p, id),
@@ -118,6 +118,7 @@ export async function updateProfile(ctx: AppContext, p: Principal, id: string, i
   const patch: Partial<typeof people.$inferInsert> = {};
   if (input.avatarColor !== undefined) patch.avatarColor = input.avatarColor;
   if (input.responsibilities !== undefined) patch.responsibilities = input.responsibilities || null;
+  if (input.phone !== undefined) patch.phone = input.phone || null;
   if (Object.keys(patch).length) await ctx.db.update(people).set(patch).where(eq(people.id, id));
 }
 

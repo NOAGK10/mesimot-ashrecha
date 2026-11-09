@@ -24,11 +24,12 @@ export function toPersonDto(r: PersonRow, withEmail: boolean, avatarUpdatedAt: D
     avatarColor: r.avatarColor ?? defaultAvatarColor(r.id),
     avatarVersion: avatarUpdatedAt ? avatarUpdatedAt.getTime() : null,
     responsibilities: r.responsibilities,
+    phone: r.phone,
   };
 }
 const toDto = toPersonDto;
 
-/** Guests see names (to know who owns what) but not e-mail addresses. */
+/** Managers and members see e-mail addresses (the contacts tab); guests see names only. */
 export async function listPeople(ctx: AppContext, p: Principal): Promise<PersonDto[]> {
   if (!policy.canListPeople(p)) throw forbidden();
   const rows = await ctx.db
@@ -37,7 +38,7 @@ export async function listPeople(ctx: AppContext, p: Principal): Promise<PersonD
     .leftJoin(personAvatars, eq(personAvatars.personId, people.id))
     .where(and(eq(people.orgId, p.orgId), isNull(people.deletedAt)))
     .orderBy(asc(people.displayName));
-  return rows.map((r) => toDto(r.person, policy.canManagePeople(p), r.avatarAt));
+  return rows.map((r) => toDto(r.person, policy.canSeeEmails(p) || r.person.id === p.personId, r.avatarAt));
 }
 
 /**

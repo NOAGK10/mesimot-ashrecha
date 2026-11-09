@@ -86,6 +86,7 @@ export const people = pgTable(
     jobTitle: text('job_title'),
     avatarColor: text('avatar_color'),
     responsibilities: text('responsibilities'),
+    phone: text('phone'),
     deactivatedAt: ts('deactivated_at'),
     /** Removed from the organisation: hidden everywhere; kept only so history still shows the name. */
     deletedAt: ts('deleted_at'),

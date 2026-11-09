@@ -16,7 +16,8 @@ export function ProfilePage() {
   const { id = '' } = useParams();
   const me = useMe();
   const profile = useProfile(id);
-  const [editing, setEditing] = useState(false);
+  // "?edit=1" (from the contacts tab) opens the edit form right away.
+  const [editing, setEditing] = useState(() => new URLSearchParams(window.location.search).get('edit') === '1');
 
   if (profile.isLoading) return <p className="muted">טוען…</p>;
   if (!profile.data) return <ErrorText error={profile.error ?? new Error()} />;
@@ -34,6 +35,20 @@ export function ProfilePage() {
             <span className="muted small">{roleLabel(person.role)}</span>
             {!person.active && <span className="tag">לא פעיל</span>}
           </div>
+          {(person.phone || person.email) && (
+            <div className="profile-contact">
+              {person.phone && (
+                <a href={`tel:${person.phone.replace(/[^\d+*#]/g, '')}`} dir="ltr">
+                  📞 {person.phone}
+                </a>
+              )}
+              {person.email && (
+                <a href={`mailto:${person.email}`} dir="ltr">
+                  ✉️ {person.email}
+                </a>
+              )}
+            </div>
+          )}
           <div className="responsibilities">
             <strong>אחראי על:</strong>{' '}
             {person.responsibilities ? <span className="pre">{person.responsibilities}</span> : <span className="muted">לא נכתב עדיין</span>}
@@ -173,6 +188,7 @@ function EditProfile({ profile, onDone }: { profile: ProfileDto; onDone: () => v
   const { person } = profile;
   const [color, setColor] = useState(person.avatarColor);
   const [responsibilities, setResponsibilities] = useState(person.responsibilities ?? '');
+  const [phone, setPhone] = useState(person.phone ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -197,7 +213,7 @@ function EditProfile({ profile, onDone }: { profile: ProfileDto; onDone: () => v
       className="card stack"
       onSubmit={(e) => {
         e.preventDefault();
-        void run(() => api('PATCH', `/api/people/${person.id}/profile`, { avatarColor: color, responsibilities: responsibilities.trim() || null }), true);
+        void run(() => api('PATCH', `/api/people/${person.id}/profile`, { avatarColor: color, responsibilities: responsibilities.trim() || null, phone: phone.trim() || null }), true);
       }}
     >
       <h2>עריכת פרופיל</h2>
@@ -245,6 +261,10 @@ function EditProfile({ profile, onDone }: { profile: ProfileDto; onDone: () => v
           </label>
         </div>
       </fieldset>
+      <label>
+        טלפון (כולם יראו אותו באנשי קשר)
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} inputMode="tel" dir="ltr" placeholder="050-0000000" />
+      </label>
       <label>
         על מה אני אחראי
         <textarea

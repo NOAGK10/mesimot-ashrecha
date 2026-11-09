@@ -16,26 +16,26 @@ describe('finance', () => {
   it('the balance is the opening amount plus income minus expenses', async () => {
     await setFinanceOpening(h.ctx, h.manager, 1_000_00);
     await report('income', 500_00);
-    await report('expense', 120_50, h.member, h.member.personId);
+    await report('expense', 120_50, h.manager, h.member.personId);
     const f = await getFinance(h.ctx, h.manager);
     expect(f).toMatchObject({ openingAgorot: 1_000_00, incomeAgorot: 500_00, expenseAgorot: 120_50, balanceAgorot: 1_379_50 });
     expect(f.entries.map((e) => e.personName)).toContain('Member');
   });
 
-  it('deleting a report takes it out of the balance; members delete only their own', async () => {
-    const f = await getFinance(h.ctx, h.member);
-    const mine = f.entries.find((e) => e.kind === 'expense')!;
-    const managers = f.entries.find((e) => e.kind === 'income')!;
-    expect([mine.canDelete, managers.canDelete]).toEqual([true, false]);
-    await expect(deleteFinanceEntry(h.ctx, h.member, managers.id)).rejects.toMatchObject({ status: 403 });
-    await deleteFinanceEntry(h.ctx, h.member, mine.id);
+  it('deleting a report takes it out of the balance', async () => {
+    const f = await getFinance(h.ctx, h.manager);
+    await deleteFinanceEntry(h.ctx, h.manager, f.entries.find((e) => e.kind === 'expense')!.id);
     expect((await getFinance(h.ctx, h.manager)).balanceAgorot).toBe(1_500_00);
   });
 
-  it('only managers set the opening amount; guests see nothing', async () => {
-    await expect(setFinanceOpening(h.ctx, h.member, 5)).rejects.toMatchObject({ status: 403 });
-    await expect(getFinance(h.ctx, h.guest)).rejects.toMatchObject({ status: 403 });
-    await expect(report('income', 100, h.guest)).rejects.toMatchObject({ status: 403 });
+  it('is for managers only: members and guests can neither see nor report', async () => {
+    for (const who of [h.member, h.guest]) {
+      await expect(getFinance(h.ctx, who)).rejects.toMatchObject({ status: 403 });
+      await expect(report('income', 100, who, who.personId)).rejects.toMatchObject({ status: 403 });
+      await expect(setFinanceOpening(h.ctx, who, 5)).rejects.toMatchObject({ status: 403 });
+    }
+    const [any] = (await getFinance(h.ctx, h.manager)).entries;
+    await expect(deleteFinanceEntry(h.ctx, h.member, any!.id)).rejects.toMatchObject({ status: 403 });
   });
 
   it('amounts must be positive whole agorot, with details', () => {

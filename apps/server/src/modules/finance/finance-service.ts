@@ -8,13 +8,12 @@ import { policy } from '../identity/policy';
 import { actorOf, type Principal } from '../identity/principal';
 
 /**
- * Finance: everyone who works in the organisation (managers and members) sees the balance and reports
- * income and expenses. The balance is the opening amount plus income minus expenses.
- * Reporters delete their own reports; managers delete any and set the opening amount.
+ * Finance is for managers only: they see the balance, report income and expenses, delete reports and
+ * set the opening amount. The balance is the opening amount plus income minus expenses.
  */
 
 function assertAllowed(p: Principal) {
-  if (!policy.canCreateTask(p)) throw forbidden();
+  if (!policy.isManager(p)) throw forbidden();
 }
 
 export async function getFinance(ctx: AppContext, p: Principal): Promise<FinanceSummaryDto> {
@@ -76,7 +75,6 @@ export async function deleteFinanceEntry(ctx: AppContext, p: Principal, id: stri
   assertAllowed(p);
   const [e] = await ctx.db.select().from(financeEntries).where(and(eq(financeEntries.id, id), eq(financeEntries.orgId, p.orgId), isNull(financeEntries.deletedAt)));
   if (!e) throw notFound('Report');
-  if (!policy.isManager(p) && e.reportedByPersonId !== p.personId) throw forbidden();
   await ctx.db.update(financeEntries).set({ deletedAt: ctx.now(), deletedByPersonId: p.personId }).where(eq(financeEntries.id, id));
 }
 

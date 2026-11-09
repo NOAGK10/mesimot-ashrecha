@@ -62,6 +62,8 @@ export const policy = {
   canListAllTasks: (p: Principal) => p.access === 'manager',
   canManagePeople: (p: Principal) => p.access === 'manager',
   canListPeople: (p: Principal) => p.access !== 'link',
+  /** Contact details (e-mail) are for people who work in the organisation, not guests. */
+  canSeeEmails: (p: Principal) => p.access === 'manager' || p.access === 'member',
   canManageRecurrence: (p: Principal) => p.access === 'manager',
   canViewOperations: (p: Principal) => p.access === 'manager',
 };
