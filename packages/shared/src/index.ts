@@ -229,37 +229,92 @@ export interface GoogleStatusDto {
 export const googleConnectSchema = z.object({ code: z.string().min(10) });
 
 // ---- Chat & inbox ----
-/** A message in the general chat (taskId null) or in a task's chat. */
-export const postMessageSchema = z.object({
-  body: z.string().trim().min(1).max(4000),
+/** Largest file or voice recording that can be sent in the chat (bytes, before base64). */
+export const MAX_CHAT_FILE_BYTES = 3 * 1024 * 1024;
+export const CHAT_ATTACHMENT_KINDS = ['file', 'voice'] as const;
+export type ChatAttachmentKind = (typeof CHAT_ATTACHMENT_KINDS)[number];
+
+export const chatAttachmentInputSchema = z.object({
+  kind: z.enum(CHAT_ATTACHMENT_KINDS),
+  fileName: z.string().trim().min(1).max(200),
+  mimeType: z.string().trim().min(1).max(120),
+  /** The file's bytes as base64 (no "data:" prefix). */
+  dataBase64: z.string().min(1).max(Math.ceil((MAX_CHAT_FILE_BYTES * 4) / 3) + 8),
+  /** Voice messages: length in milliseconds. */
+  durationMs: z.number().int().min(0).max(30 * 60_000).nullable().default(null),
+});
+
+/**
+ * A message in the general chat (no taskId, no withPersonId), in a task's chat (taskId),
+ * or in a private conversation between two people (withPersonId = the other person).
+ * The text may be empty when a file or voice recording is attached.
+ */
+export const postMessageSchema = z
+  .object({
+    body: z.string().trim().max(4000).default(''),
+    taskId: uuid.nullable().default(null),
+    withPersonId: uuid.nullable().default(null),
+    /** People tagged with @ in this message; each gets an inbox notification. */
+    mentionIds: z.array(uuid).max(50).default([]),
+    attachment: chatAttachmentInputSchema.nullable().default(null),
+  })
+  .refine((m) => m.body.length > 0 || m.attachment !== null, { message: 'Write a message or attach a file' })
+  .refine((m) => !(m.taskId && m.withPersonId), { message: 'A message belongs to a task or to a private conversation, not both' });
+
+/** Which conversation: a task's, a private one with someone, or (neither) the general chat. */
+export const chatChannelQuerySchema = z.object({
+  taskId: uuid.optional(),
+  withPersonId: uuid.optional(),
+});
+export const markChatReadSchema = z.object({
   taskId: uuid.nullable().default(null),
-  /** People tagged with @ in this message; each gets an inbox notification. */
-  mentionIds: z.array(uuid).max(50).default([]),
+  withPersonId: uuid.nullable().default(null),
+  lastId: z.number().int().positive(),
 });
 export const listMessagesQuerySchema = z.object({
   taskId: uuid.optional(),
+  withPersonId: uuid.optional(),
   /** Only messages newer than this id (polling). */
   after: z.coerce.number().int().min(0).optional(),
   /** Only messages older than this id (loading history). */
   before: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
+export interface ChatAttachmentDto {
+  id: number;
+  kind: ChatAttachmentKind;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationMs: number | null;
+}
 export interface MessageDto {
   id: number;
   taskId: string | null;
+  /** Private conversations: the two people, sorted. Null in the general chat and task chats. */
+  dmPersonIds: [string, string] | null;
   authorPersonId: string;
   body: string;
   mentionIds: string[];
+  attachment: ChatAttachmentDto | null;
   createdAt: string;
   deleted: boolean;
   canDelete: boolean;
 }
+/** How far each other person in a conversation has read (for ✓✓). */
+export interface ChatReceiptDto {
+  personId: string;
+  lastReadId: number;
+}
 
-/** One conversation in the chat sidebar: the general channel (taskId null) or a task's conversation. */
+/** One conversation in the chat sidebar: the general chat, a task's conversation or a private one. */
 export interface ChatChannelDto {
   taskId: string | null;
+  /** Private conversations: the other person. */
+  withPersonId: string | null;
   title: string;
-  last: { authorPersonId: string; body: string; createdAt: string; deleted: boolean } | null;
+  unread: number;
+  last: { authorPersonId: string; body: string; createdAt: string; deleted: boolean; attachmentKind: ChatAttachmentKind | null } | null;
 }
 
 export const INBOX_KINDS = ['mention', 'task_assigned', 'feedback'] as const;

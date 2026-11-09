@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  ChatChannelDto,
   CategoryDto,
   DocumentDto,
   GoogleStatusDto,
@@ -131,3 +132,11 @@ export function useApiMutation<TVars, TResult = unknown>(fn: (vars: TVars) => Pr
     onSettled: () => Promise.all(keys.map((queryKey) => qc.invalidateQueries({ queryKey }))),
   });
 }
+
+/** Chat conversations with unread counts (shared by the chat page and the side menu). */
+export const useChatChannels = () =>
+  useQuery({
+    queryKey: ['chat-channels'],
+    queryFn: () => api<ChatChannelDto[]>('GET', '/api/chat/channels'),
+    refetchInterval: 15_000,
+  });

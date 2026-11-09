@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { deleteMessage, listChannels, listMessages, postMessage } from '../modules/chat/chat-service';
+import { deleteMessage, getAttachment, listChannels, listMessages, listReceipts, markChatRead, postMessage } from '../modules/chat/chat-service';
 import { listInbox, markRead, unreadCount } from '../modules/inbox/inbox-service';
 import { createTask, setParticipants } from '../modules/tasks/task-service';
 import { createHarness, type Harness } from './harness';
@@ -121,5 +121,88 @@ describe('conversation list', () => {
     expect(forGuest.map((c) => c.taskId)).toContain(open.id);
     expect(forGuest.map((c) => c.taskId)).not.toContain(secret.id);
     expect(forGuest.find((c) => c.taskId === null)?.title).toBe("צ'אט כללי");
+  });
+});
+
+describe('private conversations', () => {
+  it('are seen only by the two people – not by others, not even managers', async () => {
+    const m = await postMessage(h.ctx, h.member, { taskId: null, withPersonId: h.guest.personId, mentionIds: [], body: 'רק בינינו' });
+    expect(m.dmPersonIds?.slice().sort()).toEqual([h.member.personId, h.guest.personId].sort());
+    expect((await listMessages(h.ctx, h.guest, { withPersonId: h.member.personId, limit: 50 })).map((x) => x.body)).toContain('רק בינינו');
+    // The manager has a conversation of their own with the member – a different one.
+    expect((await listMessages(h.ctx, h.manager, { withPersonId: h.member.personId, limit: 50 })).map((x) => x.body)).not.toContain('רק בינינו');
+    // Never in the general chat.
+    expect((await list(h.manager)).map((x) => x.body)).not.toContain('רק בינינו');
+    // Others cannot open its file or delete it.
+    await expect(deleteMessage(h.ctx, h.manager, m.id)).rejects.toMatchObject({ status: 404 });
+
+    const forGuest = await listChannels(h.ctx, h.guest);
+    expect(forGuest.find((c) => c.withPersonId === h.member.personId)).toMatchObject({ title: 'Member', unread: 1 });
+    expect((await listChannels(h.ctx, h.manager)).some((c) => c.withPersonId === h.guest.personId || c.withPersonId === h.member.personId && c.last?.body === 'רק בינינו')).toBe(false);
+  });
+
+  it('cannot be opened with yourself, with contacts who never sign in, or with tags', async () => {
+    await expect(postMessage(h.ctx, h.member, { taskId: null, withPersonId: h.member.personId, mentionIds: [], body: 'x' })).rejects.toMatchObject({ status: 400 });
+    await expect(postMessage(h.ctx, h.member, { taskId: null, withPersonId: h.contactId, mentionIds: [], body: 'x' })).rejects.toMatchObject({ status: 404 });
+    await expect(
+      postMessage(h.ctx, h.member, { taskId: null, withPersonId: h.guest.personId, mentionIds: [h.guest.personId], body: 'x' }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('read receipts', () => {
+  it('track how far the other person has read, and clear the unread count', async () => {
+    const m = await postMessage(h.ctx, h.partner, { taskId: null, withPersonId: h.member.personId, mentionIds: [], body: 'ראית?' });
+    expect(await listReceipts(h.ctx, h.partner, { withPersonId: h.member.personId })).toEqual([]);
+    expect((await listChannels(h.ctx, h.member)).find((c) => c.withPersonId === h.partner.personId)?.unread).toBe(1);
+
+    await markChatRead(h.ctx, h.member, { taskId: null, withPersonId: h.partner.personId, lastId: m.id });
+    expect(await listReceipts(h.ctx, h.partner, { withPersonId: h.member.personId })).toEqual([{ personId: h.member.personId, lastReadId: m.id }]);
+    expect((await listChannels(h.ctx, h.member)).find((c) => c.withPersonId === h.partner.personId)?.unread).toBe(0);
+    // Never moves backwards.
+    await markChatRead(h.ctx, h.member, { taskId: null, withPersonId: h.partner.personId, lastId: 1 });
+    expect((await listReceipts(h.ctx, h.partner, { withPersonId: h.member.personId }))[0]?.lastReadId).toBe(m.id);
+  });
+});
+
+describe('files and voice messages', () => {
+  const pdf = Buffer.from('%PDF-1.4 test').toString('base64');
+
+  it('are stored with the message and served only to people in the conversation', async () => {
+    const m = await postMessage(h.ctx, h.member, {
+      taskId: null,
+      withPersonId: h.partner.personId,
+      mentionIds: [],
+      body: '',
+      attachment: { kind: 'file', fileName: '../../secret/הצעה.pdf', mimeType: 'application/pdf', dataBase64: pdf, durationMs: null },
+    });
+    expect(m.attachment).toMatchObject({ kind: 'file', fileName: 'הצעה.pdf', mimeType: 'application/pdf', sizeBytes: 13 });
+    const file = await getAttachment(h.ctx, h.partner, m.attachment!.id);
+    expect(file.data.toString()).toBe('%PDF-1.4 test');
+    await expect(getAttachment(h.ctx, h.manager, m.attachment!.id)).rejects.toMatchObject({ status: 404 });
+
+    // A deleted message takes its file with it.
+    await deleteMessage(h.ctx, h.member, m.id);
+    await expect(getAttachment(h.ctx, h.partner, m.attachment!.id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('voice messages keep their length and must be audio', async () => {
+    const audio = Buffer.from('fake-opus-data').toString('base64');
+    const v = await postMessage(h.ctx, h.member, {
+      taskId: null,
+      mentionIds: [],
+      body: '',
+      attachment: { kind: 'voice', fileName: 'הקלטה.webm', mimeType: 'audio/webm;codecs=opus', dataBase64: audio, durationMs: 4200 },
+    });
+    expect(v.attachment).toMatchObject({ kind: 'voice', durationMs: 4200 });
+    expect((await listChannels(h.ctx, h.manager)).find((c) => c.taskId === null && c.withPersonId === null)?.last?.attachmentKind).toBe('voice');
+    await expect(
+      postMessage(h.ctx, h.member, {
+        taskId: null,
+        mentionIds: [],
+        body: '',
+        attachment: { kind: 'voice', fileName: 'x.exe', mimeType: 'application/x-msdownload', dataBase64: audio, durationMs: 1 },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
   });
 });

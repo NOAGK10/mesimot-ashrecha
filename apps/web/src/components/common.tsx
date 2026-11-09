@@ -41,6 +41,9 @@ export function PersonTag({ name, jobTitle, id, avatarFor }: { name: string; job
 
 const optionLabel = (p: PersonDto) => (p.jobTitle ? `${p.displayName} · ${p.jobTitle}` : p.displayName);
 
+/** An error whose message is already written for the user (in Hebrew). */
+export class UserError extends Error {}
+
 export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
   const message =
@@ -50,7 +53,9 @@ export function ErrorText({ error }: { error: unknown }) {
         : error.status === 403
           ? 'אין הרשאה לפעולה הזו.'
           : error.message
-      : 'אירעה שגיאה.';
+      : error instanceof UserError
+        ? error.message
+        : 'אירעה שגיאה.';
   return <p className="error">{message}</p>;
 }
 

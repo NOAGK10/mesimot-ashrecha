@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router';
+import { useChatChannels } from '../api';
 
 /** Material-style filled icons (24×24). */
 const ICONS = {
@@ -22,6 +23,11 @@ const ICONS = {
   search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
   back: 'M4 11h12.17l-5.59-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z',
   open: 'M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z',
+  file: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z',
+  attach:
+    'M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z',
+  mic: 'M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
+  trash: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
   chevron: 'M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z',
 } as const;
 
@@ -61,10 +67,17 @@ export function pageTitle(pathname: string): string {
 /** Side menu on the right: everyday pages on top, managers' pages in a collapsible "ניהול" group. */
 export function Sidebar({ isManager, onNavigate }: { isManager: boolean; onNavigate: () => void }) {
   const [adminOpen, setAdminOpen] = useState(true);
+  const channels = useChatChannels();
+  const unreadChat = (channels.data ?? []).reduce((n, c) => n + c.unread, 0);
   const link = (i: Item) => (
     <NavLink key={i.to} to={i.to} end={i.end} className="side-link" onClick={onNavigate}>
       <Icon name={i.icon} />
       <span>{i.label}</span>
+      {i.to === '/chat' && unreadChat > 0 && (
+        <span className="side-badge" aria-label={`${unreadChat} הודעות שלא נקראו`}>
+          {unreadChat > 99 ? '99+' : unreadChat}
+        </span>
+      )}
     </NavLink>
   );
   return (

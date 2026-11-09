@@ -17,6 +17,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import {
+  CHAT_ATTACHMENT_KINDS,
   DOCUMENT_KINDS,
   INBOX_KINDS,
   PERSON_ROLES,
@@ -341,20 +342,54 @@ export const googleConnections = pgTable('google_connections', {
 
 // ---------------- Chat & inbox ----------------
 
-/** Chat messages: the general channel (task_id null) or one task's conversation. */
+export const chatAttachmentKind = pgEnum('chat_attachment_kind', CHAT_ATTACHMENT_KINDS);
+
+/** A file or voice recording sent in the chat. Kept in the database (≤ 3 MB each). */
+export const chatAttachments = pgTable('chat_attachments', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id),
+  uploaderPersonId: uuid('uploader_person_id').notNull().references(() => people.id),
+  kind: chatAttachmentKind('kind').notNull(),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  durationMs: integer('duration_ms'),
+  dataBase64: text('data_base64').notNull(),
+  createdAt: createdAt(),
+});
+
+/**
+ * Chat messages: the general channel (task_id and dm_key null), one task's conversation (task_id),
+ * or a private conversation between two people (dm_key = their two person ids, sorted, joined by ":").
+ */
 export const chatMessages = pgTable(
   'chat_messages',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     orgId: uuid('org_id').notNull().references(() => organizations.id),
     taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
+    dmKey: text('dm_key'),
     authorPersonId: uuid('author_person_id').notNull().references(() => people.id),
     body: text('body').notNull(),
+    attachmentId: bigint('attachment_id', { mode: 'number' }).references(() => chatAttachments.id),
     createdAt: createdAt(),
     deletedAt: ts('deleted_at'),
     deletedByPersonId: uuid('deleted_by_person_id').references(() => people.id),
   },
-  (t) => [index('chat_messages_channel_idx').on(t.orgId, t.taskId, t.id)],
+  (t) => [index('chat_messages_channel_idx').on(t.orgId, t.taskId, t.id), index('chat_messages_dm_idx').on(t.orgId, t.dmKey, t.id)],
+);
+
+/** How far each person has read each conversation ("general", "task:<id>" or "dm:<key>"). */
+export const chatReads = pgTable(
+  'chat_reads',
+  {
+    personId: uuid('person_id').notNull().references(() => people.id, { onDelete: 'cascade' }),
+    channelKey: text('channel_key').notNull(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    lastReadId: bigint('last_read_id', { mode: 'number' }).notNull(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.personId, t.channelKey] }), index('chat_reads_channel_idx').on(t.orgId, t.channelKey)],
 );
 
 export const chatMentions = pgTable(

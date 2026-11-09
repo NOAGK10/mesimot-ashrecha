@@ -64,6 +64,13 @@
       "when": 1791136772538,
       "tag": "0008_visibility_and_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794233923718,
+      "tag": "0009_chat_dm_files_reads",
+      "breakpoints": true
     }
   ]
 }
