@@ -15,6 +15,7 @@ import { identityRoutes } from './modules/identity/routes';
 import { importRoutes } from './modules/imports/routes';
 import { policy } from './modules/identity/policy';
 import { ConsoleMailer } from './modules/notifications/mailer';
+import { adminRoutes } from './modules/admin/routes';
 import { recurrenceRoutes } from './modules/recurrence/routes';
 import { taskRoutes } from './modules/tasks/routes';
 import { runWorkerTick, workerStatus } from './worker';
@@ -68,6 +69,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions): Promise<Fasti
   googleRoutes(app, ctx);
   chatRoutes(app, ctx);
   profileRoutes(app, ctx);
+  adminRoutes(app, ctx);
 
   // Wake-up call from the external scheduler (free hosting sleeps, so the in-process loop is not enough).
   const cronSecret = ctx.config.CRON_SECRET;

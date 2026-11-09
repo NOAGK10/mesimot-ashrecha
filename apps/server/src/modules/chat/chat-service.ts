@@ -37,7 +37,7 @@ type AttachmentRow = Omit<typeof chatAttachments.$inferSelect, 'dataBase64'>;
 type Channel =
   | { kind: 'general' }
   | { kind: 'task'; task: TaskWithParticipants }
-  | { kind: 'dm'; key: string; otherPersonId: string };
+  | { kind: 'dm'; key: string; otherPersonId: string; otherActive: boolean };
 
 const dmKeyOf = (a: string, b: string) => [a, b].sort().join(':');
 const channelKey = (c: Channel) => (c.kind === 'general' ? 'general' : c.kind === 'task' ? `task:${c.task.id}` : `dm:${c.key}`);
@@ -60,12 +60,18 @@ async function openChannel(db: Db, p: Principal, q: { taskId?: string | null; wi
   }
   if (q.withPersonId) {
     if (q.withPersonId === p.personId) throw invalid('Choose someone else to talk to');
+    // Removed people stay readable in old conversations; postMessage refuses new messages to them.
     const [other] = await db
-      .select({ id: people.id })
+      .select({ id: people.id, deletedAt: people.deletedAt, deactivatedAt: people.deactivatedAt })
       .from(people)
-      .where(and(eq(people.id, q.withPersonId), eq(people.orgId, p.orgId), isNull(people.deletedAt), sql`${people.role} is not null`));
+      .where(and(eq(people.id, q.withPersonId), eq(people.orgId, p.orgId), sql`${people.role} is not null`));
     if (!other) throw notFound('Person');
-    return { kind: 'dm', key: dmKeyOf(p.personId, other.id), otherPersonId: other.id };
+    return {
+      kind: 'dm',
+      key: dmKeyOf(p.personId, other.id),
+      otherPersonId: other.id,
+      otherActive: other.deletedAt === null && other.deactivatedAt === null,
+    };
   }
   return { kind: 'general' };
 }
@@ -84,13 +90,14 @@ function attachmentDto(a: AttachmentRow): ChatAttachmentDto {
   return { id: a.id, kind: a.kind, fileName: a.fileName, mimeType: a.mimeType, sizeBytes: a.sizeBytes, durationMs: a.durationMs };
 }
 
-function toDto(m: MessageRow, mentionIds: string[], attachment: AttachmentRow | undefined, p: Principal): MessageDto {
+function toDto(m: MessageRow, authorName: string, mentionIds: string[], attachment: AttachmentRow | undefined, p: Principal): MessageDto {
   const deleted = m.deletedAt !== null;
   return {
     id: m.id,
     taskId: m.taskId,
     dmPersonIds: m.dmKey ? (m.dmKey.split(':') as [string, string]) : null,
     authorPersonId: m.authorPersonId,
+    authorName,
     body: deleted ? '' : m.body,
     mentionIds: deleted ? [] : mentionIds,
     attachment: !deleted && attachment ? attachmentDto(attachment) : null,
@@ -117,9 +124,12 @@ async function withDetails(db: Db, p: Principal, rows: MessageRow[]): Promise<Me
   const mentions = ids.length ? await db.select().from(chatMentions).where(inArray(chatMentions.messageId, ids)) : [];
   const fileIds = rows.map((r) => r.attachmentId).filter((x): x is number => x !== null);
   const files = fileIds.length ? await db.select(attachmentColumns).from(chatAttachments).where(inArray(chatAttachments.id, fileIds)) : [];
+  const authorIds = [...new Set(rows.map((r) => r.authorPersonId))];
+  const authors = authorIds.length ? await db.select({ id: people.id, name: people.displayName }).from(people).where(inArray(people.id, authorIds)) : [];
   return rows.map((r) =>
     toDto(
       r,
+      authors.find((a) => a.id === r.authorPersonId)?.name ?? '—',
       mentions.filter((m) => m.messageId === r.id).map((m) => m.personId),
       files.find((f) => f.id === r.attachmentId),
       p,
@@ -250,6 +260,7 @@ function checkAttachment(a: NonNullable<PostOutput['attachment']>): number {
 
 export async function postMessage(ctx: AppContext, p: Principal, input: PostMessageInput): Promise<MessageDto> {
   const channel = await openChannel(ctx.db, p, input);
+  if (channel.kind === 'dm' && !channel.otherActive) throw invalid('This person is no longer in the organization');
   const mentionIds = [...new Set(input.mentionIds)];
   const size = input.attachment ? checkAttachment(input.attachment) : 0;
   return ctx.db.transaction(async (tx) => {
@@ -303,7 +314,8 @@ export async function postMessage(ctx: AppContext, p: Principal, input: PostMess
     }
     // Sending a message means the sender has read the conversation up to it.
     await markReadIn(tx, p, channelKey(channel), message!.id, ctx.now());
-    return toDto(message!, mentionIds, attachment, p);
+    const [dto] = await withDetails(tx, p, [message!]);
+    return dto!;
   });
 }
 

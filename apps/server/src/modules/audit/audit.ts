@@ -4,7 +4,7 @@ import type { Db } from '../../db/client';
 import { auditEvents } from '../../db/schema';
 import type { Actor } from '../identity/principal';
 
-export type AuditEntity = 'task' | 'recurrence' | 'person';
+export type AuditEntity = 'task' | 'recurrence' | 'person' | 'organization';
 
 /** Must be called inside the transaction that performs the change it describes. */
 export async function recordAudit(

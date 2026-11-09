@@ -160,6 +160,9 @@ export function ChatPanel({
     [people.list, me.data?.personId, privateTo, withPersonId],
   );
 
+  // Removed people are no longer in the people list; their messages carry their name.
+  const authorOf = (m: MessageDto) => (people.name(m.authorPersonId) === '—' ? m.authorName : people.name(m.authorPersonId));
+
   /** ✓ sent, ✓✓ (blue) once someone else has read it. */
   const readBy = (m: MessageDto) => receipts.filter((r) => r.lastReadId >= m.id).map((r) => people.name(r.personId));
 
@@ -200,12 +203,12 @@ export function ChatPanel({
               )}
               <div id={`m${m.id}`} className={`chat-row${mine ? ' mine' : ''}${continued ? ' continued' : ''}`}>
                 {!mine && (
-                  <span className="chat-avatar">{!continued && <Avatar personId={m.authorPersonId} name={people.name(m.authorPersonId)} size={32} />}</span>
+                  <span className="chat-avatar">{!continued && <Avatar personId={m.authorPersonId} name={authorOf(m)} size={32} />}</span>
                 )}
                 <div className="chat-bubble">
                   {!mine && !continued && !withPersonId && (
                     <div className="chat-author">
-                      {people.name(m.authorPersonId)}
+                      {authorOf(m)}
                       {people.jobTitle(m.authorPersonId) && <span className="chat-job"> · {people.jobTitle(m.authorPersonId)}</span>}
                     </div>
                   )}

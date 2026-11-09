@@ -43,7 +43,7 @@ export function ChatPage() {
   const title = openTaskId
     ? (current?.title ?? task.data?.title ?? 'שיחה על משימה')
     : openPersonId
-      ? people.name(openPersonId)
+      ? (current?.title ?? people.name(openPersonId))
       : "צ'אט כללי";
   const subtitle = openTaskId ? 'שיחה על משימה' : openPersonId ? `${people.jobTitle(openPersonId) || 'שיחה פרטית'} · 🔒 רק שניכם` : 'כל הארגון';
 

@@ -294,6 +294,8 @@ export interface MessageDto {
   /** Private conversations: the two people, sorted. Null in the general chat and task chats. */
   dmPersonIds: [string, string] | null;
   authorPersonId: string;
+  /** Kept with the message so it still shows after the author is removed from the organisation. */
+  authorName: string;
   body: string;
   mentionIds: string[];
   attachment: ChatAttachmentDto | null;

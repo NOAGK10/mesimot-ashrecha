@@ -615,3 +615,9 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 @media (prefers-color-scheme: dark) {
   .chat-file { background: rgba(255, 255, 255, 0.06); }
 }
+
+/* ---- Danger zone (settings) ---- */
+.danger-zone { border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+.danger-zone h2 { color: var(--danger); }
+button.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+button.danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 85%, #000) !important; border-color: var(--danger) !important; }

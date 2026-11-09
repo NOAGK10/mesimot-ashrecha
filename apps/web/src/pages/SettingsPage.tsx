@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { OrganizationDto, TaskCategoryDto } from '@org/shared';
 import { AVATAR_COLORS } from '@org/shared';
 import { api, useApiMutation, useTaskCategories } from '../api';
@@ -73,6 +73,7 @@ export function SettingsPage() {
         </div>
       </form>
       <TaskCategoriesSettings />
+      <ResetContent />
     </section>
   );
 }
@@ -134,6 +135,73 @@ function TaskCategoriesSettings() {
         </button>
       </form>
       <ErrorText error={add.error ?? update.error ?? remove.error} />
+    </div>
+  );
+}
+
+/**
+ * Starting over: deletes all tasks, categories, documents, profile texts, feedback and everyone
+ * except the manager doing it. The chat stays. Asks for a typed word, since it cannot be undone.
+ */
+function ResetContent() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [word, setWord] = useState('');
+  const [done, setDone] = useState<null | { tasks: number; people: number; documents: number; categories: number }>(null);
+  const reset = useMutation({
+    mutationFn: () => api<{ tasks: number; people: number; documents: number; categories: number }>('POST', '/api/admin/reset-content', { confirmation: word }),
+    onSuccess: (r) => {
+      setDone(r);
+      setWord('');
+      setOpen(false);
+      void qc.invalidateQueries();
+    },
+  });
+  return (
+    <div className="card danger-zone">
+      <h2>התחלה מחדש</h2>
+      <p className="small">
+        מוחק מהאתר את <strong>כל המשימות</strong> (כולל משימות חוזרות, ההיסטוריה שלהן והשיחות עליהן), את <strong>הקטגוריות</strong>, את{' '}
+        <strong>המסמכים</strong>, את מה שכתוב בפרופילים ב"אחראי על" ואת <strong>המשובים</strong>, ומוציא מהמערכת את <strong>כל האנשים חוץ ממך</strong>.
+      </p>
+      <p className="small">
+        <strong>הצ'אט נשאר:</strong> הצ'אט הכללי והשיחות הפרטיות, כולל ההודעות של מי שהוצא.
+      </p>
+      <p className="small danger-text">
+        <strong>אי אפשר לבטל את זה.</strong>
+      </p>
+      {done && (
+        <p className="small">
+          ✓ בוצע: נמחקו {done.tasks} משימות, {done.categories} קטגוריות ו-{done.documents} מסמכים, והוצאו {done.people} אנשים.
+        </p>
+      )}
+      {!open ? (
+        <button type="button" className="secondary warn" onClick={() => setOpen(true)}>
+          מחיקת כל התוכן…
+        </button>
+      ) : (
+        <form
+          className="stack"
+          onSubmit={(e) => {
+            e.preventDefault();
+            reset.mutate();
+          }}
+        >
+          <label>
+            כדי לאשר, כתבו את המילה <strong>מחיקה</strong>
+            <input value={word} onChange={(e) => setWord(e.target.value)} autoFocus aria-label="מילת אישור" />
+          </label>
+          <div className="actions">
+            <button type="submit" className="danger-solid" disabled={word.trim() !== 'מחיקה' || reset.isPending}>
+              {reset.isPending ? 'מוחק…' : "למחוק הכול חוץ מהצ'אט"}
+            </button>
+            <button type="button" className="secondary" onClick={() => (setOpen(false), setWord(''))}>
+              ביטול
+            </button>
+          </div>
+          <ErrorText error={reset.error} />
+        </form>
+      )}
     </div>
   );
 }
