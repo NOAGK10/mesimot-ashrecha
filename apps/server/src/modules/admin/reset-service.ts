@@ -6,6 +6,7 @@ import {
   financeEntries,
   institutions,
   sheetContacts,
+  contactCategories,
   organizations,
   chatReads,
   documentCategories,
@@ -78,6 +79,7 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
     // The institutions list and its sheet link (the sheet itself is not touched).
     await tx.delete(institutions).where(eq(institutions.orgId, org));
     await tx.delete(sheetContacts).where(eq(sheetContacts.orgId, org));
+    await tx.delete(contactCategories).where(eq(contactCategories.orgId, org)); // members cascade
     await tx
       .update(organizations)
       .set({

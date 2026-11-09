@@ -619,6 +619,9 @@ export const SHEET_CONTACT_FIELDS = ['name', 'phone', 'email', 'responsible', 'a
 export type SheetContactField = (typeof SHEET_CONTACT_FIELDS)[number];
 export interface SheetContactDto {
   id: string;
+  /** Stable across updates from the sheet (name + phone); categories are kept by it. */
+  key: string;
+  categoryIds: string[];
   name: string;
   phone: string;
   email: string;
@@ -626,7 +629,15 @@ export interface SheetContactDto {
   responsible: string;
   address: string;
 }
+export interface ContactCategoryDto {
+  id: string;
+  name: string;
+  color: string;
+}
+export const contactCategorySchema = z.object({ name: z.string().trim().min(1).max(60), color: hexColor });
+export const contactCategoryMembersSchema = z.object({ keys: z.array(z.string().min(1).max(400)).max(5000) });
 export interface SheetContactsDto {
+  categories: ContactCategoryDto[];
   sheetUrl: string | null;
   syncedAt: string | null;
   syncError: string | null;

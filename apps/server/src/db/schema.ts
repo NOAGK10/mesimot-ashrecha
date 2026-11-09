@@ -561,3 +561,29 @@ export const sheetContacts = pgTable(
   },
   (t) => [index('sheet_contacts_org_idx').on(t.orgId, t.position)],
 );
+
+/** Categories a manager defines for the sheet contacts (e.g. suppliers, donors). */
+export const contactCategories = pgTable(
+  'contact_categories',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    name: text('name').notNull(),
+    color: text('color').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('contact_categories_org_name_uq').on(t.orgId, t.name)],
+);
+
+/**
+ * Which contacts are in which category. Sheet rows are replaced on every update, so membership is kept
+ * by the contact's key (name + phone) rather than by row id.
+ */
+export const contactCategoryMembers = pgTable(
+  'contact_category_members',
+  {
+    categoryId: uuid('category_id').notNull().references(() => contactCategories.id, { onDelete: 'cascade' }),
+    contactKey: text('contact_key').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.categoryId, t.contactKey] })],
+);

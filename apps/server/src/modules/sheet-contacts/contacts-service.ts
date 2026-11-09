@@ -6,6 +6,7 @@ import { AppError, forbidden, invalid } from '../../lib/errors';
 import { parseGoogleUrl } from '../google/gateway';
 import { mapSheetRows, normHeader, readSheetRows } from '../google/sheet-table';
 import { policy } from '../identity/policy';
+import { contactKey, listContactCategories } from './category-service';
 import type { Principal } from '../identity/principal';
 
 /**
@@ -62,13 +63,18 @@ export async function getSheetContacts(ctx: AppContext, p: Principal): Promise<S
     [org] = await ctx.db.select().from(organizations).where(eq(organizations.id, p.orgId));
   }
   const rows = await ctx.db.select().from(sheetContacts).where(eq(sheetContacts.orgId, p.orgId)).orderBy(asc(sheetContacts.position));
+  const { categories, members } = await listContactCategories(ctx, p.orgId);
   return {
+    categories,
     sheetUrl: org?.contactsSheetId ? sheetUrl(org.contactsSheetId) : null,
     syncedAt: org?.contactsSyncedAt?.toISOString() ?? null,
     syncError: org?.contactsSyncError ?? null,
     unmatchedColumns: org?.contactsUnmatched ?? [],
     canManage: policy.isManager(p),
-    items: rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, email: r.email, responsible: r.responsible, address: r.address })),
+    items: rows.map((r) => {
+      const key = contactKey(r.name, r.phone);
+      return { id: r.id, key, categoryIds: members.get(key) ?? [], name: r.name, phone: r.phone, email: r.email, responsible: r.responsible, address: r.address };
+    }),
   };
 }
 
