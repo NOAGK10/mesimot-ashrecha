@@ -1,5 +1,5 @@
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router';
-import { useEffect } from 'react';
+import { Link, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, useMe } from './api';
 import { LoginPage } from './pages/LoginPage';
@@ -20,9 +20,12 @@ import { TaskBoardPage } from './pages/TaskBoardPage';
 import { BoardPage } from './pages/BoardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PrivacyPage, TermsPage } from './pages/LegalPages';
+import { Icon, Sidebar, pageTitle } from './components/Sidebar';
 
 export function App() {
   const me = useMe();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuCollapsed, setMenuCollapsed] = useState(false);
   const location = useLocation();
   const orgName = me.data?.organization.name;
   useEffect(() => {
@@ -41,9 +44,9 @@ export function App() {
   // A magic-link visitor sees exactly one task and nothing else.
   if (me.data.access === 'link') {
     return (
-      <div className="shell">
+      <div className="shell no-menu">
         <header className="topbar">
-          <span className="brand"><span className="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1" /><path d="m3 17 2 2 4-4" /><path d="M13 6h8M13 12h8M13 18h8" /></svg></span>{me.data.organization.name}</span>
+          <span className="brand"><span className="brand-icon" aria-hidden="true"><Icon name="tasks" size={18} /></span>{me.data.organization.name}</span>
           <span className="muted small">גישה באמצעות קישור · {me.data.displayName}</span>
         </header>
         <main className="content">
@@ -57,31 +60,28 @@ export function App() {
   }
 
   const isManager = me.data.access === 'manager';
+  // Phones: the menu slides in over the page. Wide screens: the button folds it away.
+  const toggleMenu = () => (window.matchMedia('(max-width: 900px)').matches ? setMenuOpen((o) => !o) : setMenuCollapsed((c) => !c));
   const canCreate = isManager || me.data.access === 'member';
   return (
-    <div className="shell">
+    <div className={`shell${menuOpen ? ' menu-open' : ''}${menuCollapsed ? ' menu-collapsed' : ''}`}>
       <header className="topbar">
-        <span className="brand"><span className="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1" /><path d="m3 17 2 2 4-4" /><path d="M13 6h8M13 12h8M13 18h8" /></svg></span>{me.data.organization.name}</span>
-        <nav className="nav">
-          <NavLink to="/home">בית</NavLink>
-          <NavLink to="/tasks">משימות</NavLink>
-          <NavLink to="/task-board">לוח משימות</NavLink>
-          <NavLink to="/board">לוח אחראים</NavLink>
-          <NavLink to="/chat">צ'אט</NavLink>
-          {isManager && (
-            <>
-              <NavLink to="/people" end>
-                ניהול אנשים
-              </NavLink>
-              <NavLink to="/recurring">משימות חוזרות</NavLink>
-              <NavLink to="/documents">מסמכים</NavLink>
-              <NavLink to="/import">ייבוא</NavLink>
-            </>
-          )}
-        </nav>
+        <button type="button" className="icon-btn" aria-label="תפריט" aria-expanded={menuOpen} onClick={toggleMenu}>
+          <Icon name="menu" />
+        </button>
+        <Link to="/home" className="brand">
+          <span className="brand-icon" aria-hidden="true">
+            <Icon name="tasks" size={18} />
+          </span>
+          {me.data.organization.name}
+        </Link>
+        <span className="page-title">{pageTitle(location.pathname)}</span>
+        <span className="topbar-spacer" />
         <Bell />
         <UserMenu name={me.data.displayName} personId={me.data.personId} isManager={isManager} />
       </header>
+      <div className="side-backdrop" onClick={() => setMenuOpen(false)} />
+      <Sidebar isManager={isManager} onNavigate={() => setMenuOpen(false)} />
       <main className="content">
         <Routes>
           <Route path="/home" element={<HomePage />} />
@@ -132,8 +132,9 @@ function Bell() {
   const inbox = useInbox();
   const unread = inbox.data?.unread ?? 0;
   return (
-    <Link to="/home" className="bell" aria-label={unread ? `${unread} התראות חדשות` : 'התראות'} title="התראות">
-      🔔{unread > 0 && <span className="bell-count">{unread > 99 ? '99+' : unread}</span>}
+    <Link to="/home" className="bell icon-btn" aria-label={unread ? `${unread} התראות חדשות` : 'התראות'} title="התראות">
+      <Icon name="bell" />
+      {unread > 0 && <span className="bell-count">{unread > 99 ? '99+' : unread}</span>}
     </Link>
   );
 }
@@ -156,8 +157,8 @@ function UserMenu({ name, personId, isManager }: { name: string; personId: strin
   return (
     <details className="user-menu">
       <summary>
-        <Avatar personId={personId} name={name} size={26} />
-        {name}
+        <span className="user-name">{name}</span>
+        <Avatar personId={personId} name={name} size={32} />
         {problem && <span className="alert-dot" title="יש תקלה במערכת" />} ▾
       </summary>
       <div className="menu">
