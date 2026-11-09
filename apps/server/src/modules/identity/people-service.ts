@@ -29,7 +29,7 @@ export function toPersonDto(r: PersonRow, withEmail: boolean, avatarUpdatedAt: D
 }
 const toDto = toPersonDto;
 
-/** Managers and members see e-mail addresses (the contacts tab); guests see names only. */
+/** Only managers see other people's e-mail addresses; everyone sees their own. */
 export async function listPeople(ctx: AppContext, p: Principal): Promise<PersonDto[]> {
   if (!policy.canListPeople(p)) throw forbidden();
   const rows = await ctx.db
