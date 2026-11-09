@@ -159,25 +159,36 @@ function ResetContent() {
   });
   return (
     <div className="card danger-zone">
-      <h2>התחלה מחדש</h2>
-      <p className="small">
-        מוחק מהאתר את <strong>כל המשימות</strong> (כולל משימות חוזרות, ההיסטוריה שלהן והשיחות עליהן), את <strong>הקטגוריות</strong>, את{' '}
-        <strong>המסמכים</strong>, את מה שכתוב בפרופילים ב"אחראי על" ואת <strong>המשובים</strong>, ומוציא מהמערכת את <strong>כל האנשים חוץ ממך</strong>.
-      </p>
-      <p className="small">
-        <strong>הצ'אט נשאר:</strong> הצ'אט הכללי והשיחות הפרטיות, כולל ההודעות של מי שהוצא.
-      </p>
-      <p className="small danger-text">
+      <h2>מחיקת כל התוכן</h2>
+      <div className="reset-lists">
+        <div>
+          <strong>יימחק:</strong>
+          <ul className="reset-list">
+            <li>כל המשימות</li>
+            <li>הקטגוריות</li>
+            <li>המסמכים</li>
+            <li>"אחראי על" והמשובים בפרופילים</li>
+            <li>כל האנשים, חוץ ממך</li>
+          </ul>
+        </div>
+        <div>
+          <strong>יישאר:</strong>
+          <ul className="reset-list keep">
+            <li>הצ'אט</li>
+          </ul>
+        </div>
+      </div>
+      <p className="danger-text">
         <strong>אי אפשר לבטל את זה.</strong>
       </p>
       {done && (
-        <p className="small">
-          ✓ בוצע: נמחקו {done.tasks} משימות, {done.categories} קטגוריות ו-{done.documents} מסמכים, והוצאו {done.people} אנשים.
+        <p className="reset-done">
+          ✓ התוכן נמחק ({done.tasks} משימות, {done.people} אנשים)
         </p>
       )}
       {!open ? (
-        <button type="button" className="secondary warn" onClick={() => setOpen(true)}>
-          מחיקת כל התוכן…
+        <button type="button" className="danger-solid" onClick={() => setOpen(true)}>
+          מחיקת כל התוכן
         </button>
       ) : (
         <form
@@ -188,12 +199,12 @@ function ResetContent() {
           }}
         >
           <label>
-            כדי לאשר, כתבו את המילה <strong>מחיקה</strong>
-            <input value={word} onChange={(e) => setWord(e.target.value)} autoFocus aria-label="מילת אישור" />
+            לאישור, כתבו: <strong>מחיקה</strong>
+            <input value={word} onChange={(e) => setWord(e.target.value)} autoFocus aria-label="מילת אישור" placeholder="מחיקה" />
           </label>
           <div className="actions">
             <button type="submit" className="danger-solid" disabled={word.trim() !== 'מחיקה' || reset.isPending}>
-              {reset.isPending ? 'מוחק…' : "למחוק הכול חוץ מהצ'אט"}
+              {reset.isPending ? 'מוחק…' : 'למחוק עכשיו'}
             </button>
             <button type="button" className="secondary" onClick={() => (setOpen(false), setWord(''))}>
               ביטול

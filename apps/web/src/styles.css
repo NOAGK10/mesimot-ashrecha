@@ -621,3 +621,10 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 .danger-zone h2 { color: var(--danger); }
 button.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
 button.danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 85%, #000) !important; border-color: var(--danger) !important; }
+
+/* Starting over: two short lists, what goes and what stays */
+.reset-lists { display: flex; gap: 32px; flex-wrap: wrap; margin: 8px 0; }
+.reset-list { margin: 6px 0 0; padding-inline-start: 20px; line-height: 1.9; }
+.reset-list li::marker { color: #dc2626; }
+.reset-list.keep li::marker { color: #16a34a; }
+.reset-done { color: #15803d; font-weight: 500; }
