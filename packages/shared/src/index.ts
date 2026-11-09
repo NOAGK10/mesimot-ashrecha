@@ -731,7 +731,32 @@ export interface DistributionPointDto {
   /** The sheet's other columns for this point (e.g. neighbourhood, street), as [header, value]. */
   extra: [string, string][];
 }
+/** What the site read from a sheet: shown to managers, so a wrong column is easy to spot. */
+export interface SheetReadStats {
+  /** Non-empty rows in the tab, under the header row. */
+  rowsInSheet: number;
+  loaded: number;
+  /** Rows skipped because the name column was empty. */
+  skipped: number;
+  /** Which column is used for each field ('' = none). */
+  columns: Record<string, string>;
+  /** True when a manager chose the columns. */
+  manual: boolean;
+}
+export interface SheetColumnsDto {
+  headers: string[];
+  sample: string[][];
+  columns: Record<string, string>;
+  rowsInSheet: number;
+  loaded: number;
+}
+export const distributionColumnsSchema = z.object({
+  columns: z
+    .object({ name: z.string().trim().min(1).max(200), phone: z.string().max(200).nullable(), city: z.string().max(200).nullable(), notes: z.string().max(200).nullable() })
+    .nullable(),
+});
 export interface DistributionPointsDto {
+  stats: SheetReadStats | null;
   sheetUrl: string | null;
   syncedAt: string | null;
   syncError: string | null;

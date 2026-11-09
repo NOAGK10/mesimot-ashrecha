@@ -148,6 +148,13 @@
       "when": 1794252497502,
       "tag": "0020_distribution_extra",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794252849889,
+      "tag": "0021_sheet_columns",
+      "breakpoints": true
     }
   ]
 }

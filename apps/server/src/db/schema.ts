@@ -656,6 +656,10 @@ export const sheetSources = pgTable(
     syncedAt: ts('synced_at'),
     syncError: text('sync_error'),
     unmatched: jsonb('unmatched').$type<string[]>(),
+    /** A manager's choice of columns (field → header); null = recognised automatically. */
+    columns: jsonb('columns').$type<Record<string, string | null>>(),
+    /** What the last update read: rows in the sheet, loaded, skipped and the columns used. */
+    stats: jsonb('stats').$type<{ rowsInSheet: number; loaded: number; skipped: number; columns: Record<string, string> }>(),
   },
   (t) => [primaryKey({ columns: [t.orgId, t.kind] })],
 );

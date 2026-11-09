@@ -1,5 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getDistributionPoints, mapPointsSheet, pointFieldOf, refreshDistributionPoints, setDistributionSheet } from '../modules/distribution/distribution-service';
+import {
+  getDistributionPoints,
+  mapPointsSheet,
+  pointFieldOf,
+  previewDistributionColumns,
+  refreshDistributionPoints,
+  setDistributionColumns,
+  setDistributionSheet,
+} from '../modules/distribution/distribution-service';
 import { getSheetContacts } from '../modules/sheet-contacts/contacts-service';
 import { createHarness, type Harness } from './harness';
 
@@ -51,6 +59,37 @@ describe('distribution points from a Google Sheet', () => {
     expect(r.items[0]!.extra).toEqual([['שכונה / אזור', 'מרכז'], ['רחוב', 'רבי עקיבא 3'], ['קיבלו?', 'כן']]);
     expect(r.items[1]!.extra).toEqual([]);
     expect(r.unmatchedColumns).toEqual([]);
+  });
+
+  it('tells the manager how many rows were read and skipped; a manager can choose the columns', async () => {
+    const ID = 'chooseColsSheet0001';
+    // "שם" is mostly empty (only some rows have a place name); the families are in "עמודה 1".
+    h.fakeDrive.publicCsv.set(
+      ID,
+      csv([
+        ['עמודה 1', 'שם', 'טלפון', 'עיר', 'הערות'],
+        ['משפחת כהן', 'בארון חשמל', '050-1', 'אלעד', 'בערב'],
+        ['משפחת לוי', '', '050-2', 'אלעד', ''],
+        ['משפחת כץ', '', '050-3', 'צפת', ''],
+        ['', '', '', '', ''],
+      ]),
+    );
+    const auto = await setDistributionSheet(h.ctx, h.manager, `https://docs.google.com/spreadsheets/d/${ID}/edit`);
+    expect(auto.stats).toMatchObject({ rowsInSheet: 3, loaded: 1, skipped: 2, manual: false, columns: { name: 'שם', phone: 'טלפון' } });
+    expect((await getDistributionPoints(h.ctx, h.member)).stats).toBeNull(); // managers only
+
+    const preview = await previewDistributionColumns(h.ctx, h.manager);
+    expect(preview.headers).toEqual(['עמודה 1', 'שם', 'טלפון', 'עיר', 'הערות']);
+    expect(preview.sample[1]).toEqual(['משפחת לוי', '', '050-2', 'אלעד', '']);
+
+    const chosen = await setDistributionColumns(h.ctx, h.manager, { name: 'עמודה 1', phone: 'טלפון', city: 'עיר', notes: 'הערות' });
+    expect(chosen.items.map((i) => i.name)).toEqual(['משפחת כהן', 'משפחת לוי', 'משפחת כץ']);
+    expect(chosen.items[0]!.extra).toEqual([['שם', 'בארון חשמל']]);
+    expect(chosen.stats).toMatchObject({ rowsInSheet: 3, loaded: 3, skipped: 0, manual: true });
+    // It stays chosen on updates; null goes back to automatic.
+    expect((await refreshDistributionPoints(h.ctx, h.manager)).items).toHaveLength(3);
+    expect((await setDistributionColumns(h.ctx, h.manager, null)).items).toHaveLength(1);
+    await expect(setDistributionColumns(h.ctx, h.member, null)).rejects.toMatchObject({ status: 403 });
   });
 
   it('is separate from the other sheet lists, and closed to guests; only managers connect', async () => {

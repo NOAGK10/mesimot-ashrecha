@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { DistributionPointsDto } from '@org/shared';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { DistributionPointsDto, SheetColumnsDto } from '@org/shared';
 import { api } from '../api';
 import { ErrorText } from '../components/common';
 import { ConnectSheet, SheetSourceBar, type SheetListConfig } from '../components/SheetSource';
@@ -22,6 +22,7 @@ export function DistributionPage() {
   const [city, setCity] = useState('');
   const [onlyNotes, setOnlyNotes] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [choosing, setChoosing] = useState(false);
 
   const items = data.data?.items ?? [];
   const cities = useMemo(() => [...new Set(items.map((i) => i.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'he')), [items]);
@@ -69,6 +70,24 @@ export function DistributionPage() {
         )}
       </div>
       <SheetSourceBar info={d} cfg={CFG} onReplace={() => setChanging(true)} />
+      {d.stats && (
+        <div className={`dp-stats small${d.stats.skipped > 0 ? ' warn' : ''}`}>
+          <span>
+            בקובץ <strong>{d.stats.rowsInSheet}</strong> שורות · נטענו <strong>{d.stats.loaded}</strong>
+            {d.stats.skipped > 0 && (
+              <>
+                {' '}
+                · <strong>{d.stats.skipped}</strong> שורות דולגו, כי העמודה "{d.stats.columns.name || '—'}" ריקה בהן
+              </>
+            )}
+            {d.stats.manual && ' · העמודות נבחרו ידנית'}
+          </span>
+          <button type="button" className="link" onClick={() => setChoosing(true)}>
+            בחירת עמודות
+          </button>
+        </div>
+      )}
+      {choosing && <ColumnsDialog onClose={() => setChoosing(false)} />}
 
       {items.length > 0 && shown.length === 0 && <p className="muted">אין מוקדים שמתאימים לחיפוש.</p>}
       <ul className="plain inst-grid">
@@ -105,5 +124,129 @@ export function DistributionPage() {
         ))}
       </ul>
     </section>
+  );
+}
+
+const FIELDS = [
+  ['name', 'שם המוקד', true],
+  ['phone', 'טלפון', false],
+  ['city', 'עיר', false],
+  ['notes', 'הערות', false],
+] as const;
+
+/** Shows the sheet's headers and first rows; the manager picks which column is which. */
+function ColumnsDialog({ onClose }: { onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const qc = useQueryClient();
+  const preview = useQuery({ queryKey: ['distribution-columns'], queryFn: () => api<SheetColumnsDto>('GET', `${CFG.base}/columns`), gcTime: 0 });
+  const [pick, setPick] = useState<Record<string, string> | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    if (ref.current && !ref.current.open) ref.current.showModal();
+  }, []);
+  useEffect(() => {
+    if (preview.data && !pick) setPick({ ...preview.data.columns });
+  }, [preview.data, pick]);
+
+  const close = () => (ref.current?.close(), onClose());
+  const save = async (columns: Record<string, string | null> | null) => {
+    setPending(true);
+    setError(null);
+    try {
+      qc.setQueryData(CFG.queryKey, await api<DistributionPointsDto>('PUT', `${CFG.base}/columns`, { columns }));
+      close();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPending(false);
+    }
+  };
+  const p = preview.data;
+  const nameIdx = p && pick ? p.headers.indexOf(pick.name ?? '') : -1;
+  const withName = p && nameIdx >= 0 ? p.sample.filter((r) => r[nameIdx]).length : 0;
+
+  return (
+    <dialog ref={ref} className="task-dialog cols-dialog" onClose={onClose} onClick={(e) => e.target === ref.current && close()} aria-labelledby="cols-title">
+      <form
+        className="task-dialog-body"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (pick) void save({ name: pick.name!, phone: pick.phone || null, city: pick.city || null, notes: pick.notes || null });
+        }}
+      >
+        <h2 id="cols-title">איזו עמודה היא מה?</h2>
+        {preview.isLoading && <p className="muted">קורא את הקובץ…</p>}
+        <ErrorText error={preview.error} />
+        {p && pick && (
+          <>
+            <p className="small muted">
+              בקובץ {p.rowsInSheet} שורות. בחרו לכל שדה את העמודה שלו. שורה בלי ערך בעמודת השם לא תיכנס. עמודות שלא נבחרו יוצגו בכרטיס בשם שלהן.
+            </p>
+            <div className="cols-grid">
+              {FIELDS.map(([f, label, required]) => (
+                <label key={f}>
+                  {label}
+                  {required && ' *'}
+                  <select value={pick[f] ?? ''} onChange={(e) => setPick({ ...pick, [f]: e.target.value })} required={required}>
+                    <option value="">{required ? 'בחירה…' : '— אין —'}</option>
+                    {p.headers.map((h, i) =>
+                      h ? (
+                        <option key={i} value={h}>
+                          {h}
+                        </option>
+                      ) : null,
+                    )}
+                  </select>
+                </label>
+              ))}
+            </div>
+            <div className="cols-preview">
+              <table>
+                <thead>
+                  <tr>
+                    {p.headers.map((h, i) => {
+                      const f = FIELDS.find(([k]) => pick[k] === h && h);
+                      return (
+                        <th key={i} className={f ? 'picked' : ''}>
+                          {h || <span className="muted">(ללא כותרת)</span>}
+                          {f && <span className="cols-badge">{f[1]}</span>}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.sample.map((r, ri) => (
+                    <tr key={ri} className={nameIdx >= 0 && !r[nameIdx] ? 'skipped' : ''}>
+                      {r.map((c, ci) => (
+                        <td key={ci}>{c}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {nameIdx >= 0 && p.sample.length > 0 && (
+              <p className="small muted">
+                מתוך {p.sample.length} השורות הראשונות, {withName} ייכנסו. שורות באפור ידלגו כי אין בהן שם.
+              </p>
+            )}
+          </>
+        )}
+        <ErrorText error={error} />
+        <div className="task-dialog-actions">
+          <button type="submit" disabled={pending || !pick?.name}>
+            {pending ? 'שומר…' : 'שמירה'}
+          </button>
+          <button type="button" className="link" onClick={close}>
+            ביטול
+          </button>
+          <button type="button" className="link" disabled={pending} onClick={() => void save(null)}>
+            חזרה לזיהוי אוטומטי
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }

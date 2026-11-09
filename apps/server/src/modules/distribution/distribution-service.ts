@@ -1,5 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
-import type { DistributionPointsDto } from '@org/shared';
+import type { DistributionPointsDto, SheetColumnsDto } from '@org/shared';
 import type { AppContext } from '../../context';
 import { distributionPoints, sheetSources } from '../../db/schema';
 import { AppError, forbidden, invalid } from '../../lib/errors';
@@ -28,7 +28,8 @@ export function pointFieldOf(header: string): Field | null {
   return null;
 }
 
-export const mapPointsSheet = (raw: string[][]) => mapSheetRows<Field>(raw, { fieldOf: pointFieldOf, order: ['name', 'phone', 'city', 'notes'], required: 'name' });
+export const mapPointsSheet = (raw: string[][], choice?: Partial<Record<Field, string | null>> | null) =>
+  mapSheetRows<Field>(raw, { fieldOf: pointFieldOf, order: ['name', 'phone', 'city', 'notes'], required: 'name' }, choice);
 
 const where = (orgId: string) => and(eq(sheetSources.orgId, orgId), eq(sheetSources.kind, KIND));
 const source = async (ctx: AppContext, orgId: string) => (await ctx.db.select().from(sheetSources).where(where(orgId)))[0] ?? null;
@@ -37,14 +38,16 @@ async function sync(ctx: AppContext, orgId: string): Promise<void> {
   const src = await source(ctx, orgId);
   if (!src) return;
   try {
-    const { rows, extras } = mapPointsSheet(await readSheetRows(ctx, orgId, src.sheetId, src.byPersonId, src.gid));
+    const m = mapPointsSheet(await readSheetRows(ctx, orgId, src.sheetId, src.byPersonId, src.gid), src.columns);
+    const { rows, extras } = m;
+    const stats = { rowsInSheet: m.dataRows, loaded: rows.length, skipped: m.skipped, columns: m.chosen };
     await ctx.db.transaction(async (tx) => {
       await tx.delete(distributionPoints).where(eq(distributionPoints.orgId, orgId));
       for (let i = 0; i < rows.length; i += 500) {
         await tx.insert(distributionPoints).values(rows.slice(i, i + 500).map((r, j) => ({ ...r, extra: extras[i + j] ?? [], orgId, position: i + j })));
       }
       // Other columns are shown on each card, so none are reported as "not shown".
-      await tx.update(sheetSources).set({ syncedAt: ctx.now(), syncError: null, unmatched: [] }).where(where(orgId));
+      await tx.update(sheetSources).set({ syncedAt: ctx.now(), syncError: null, unmatched: [], stats }).where(where(orgId));
     });
   } catch (e) {
     const message = e instanceof AppError ? e.message : 'The sheet could not be read';
@@ -63,6 +66,7 @@ export async function getDistributionPoints(ctx: AppContext, p: Principal): Prom
   }
   const rows = await ctx.db.select().from(distributionPoints).where(eq(distributionPoints.orgId, p.orgId)).orderBy(asc(distributionPoints.position));
   return {
+    stats: src?.stats && policy.isManager(p) ? { ...src.stats, manual: !!src.columns } : null,
     sheetUrl: src ? sheetLink(src.sheetId, src.gid) : null,
     syncedAt: src?.syncedAt?.toISOString() ?? null,
     syncError: src?.syncError ?? null,
@@ -79,8 +83,31 @@ export async function setDistributionSheet(ctx: AppContext, p: Principal, url: s
   if (mapPointsSheet(await readSheetRows(ctx, p.orgId, parsed.fileId, p.personId, parsed.gid)).rows.length === 0) {
     throw invalid('No rows with a name were found in the first tab of the sheet');
   }
-  const row = { orgId: p.orgId, kind: KIND, sheetId: parsed.fileId, gid: parsed.gid, byPersonId: p.personId, syncedAt: null, syncError: null };
+  // A new sheet starts with automatic recognition of its columns.
+  const row = { orgId: p.orgId, kind: KIND, sheetId: parsed.fileId, gid: parsed.gid, byPersonId: p.personId, syncedAt: null, syncError: null, columns: null };
   await ctx.db.insert(sheetSources).values(row).onConflictDoUpdate({ target: [sheetSources.orgId, sheetSources.kind], set: row });
+  await sync(ctx, p.orgId);
+  return getDistributionPoints(ctx, p);
+}
+
+/** The sheet as read now: its headers, first rows and the columns used – for choosing columns by hand. */
+export async function previewDistributionColumns(ctx: AppContext, p: Principal): Promise<SheetColumnsDto> {
+  if (!policy.isManager(p)) throw forbidden();
+  const src = await source(ctx, p.orgId);
+  if (!src) throw invalid('No sheet is connected');
+  const m = mapPointsSheet(await readSheetRows(ctx, p.orgId, src.sheetId, src.byPersonId, src.gid), src.columns);
+  return { headers: m.headers, sample: m.sample, columns: m.chosen, rowsInSheet: m.dataRows, loaded: m.rows.length };
+}
+
+/** A manager chooses which column is which (null = back to automatic), and the list is read again. */
+export async function setDistributionColumns(
+  ctx: AppContext,
+  p: Principal,
+  columns: { name: string; phone: string | null; city: string | null; notes: string | null } | null,
+): Promise<DistributionPointsDto> {
+  if (!policy.isManager(p)) throw forbidden();
+  if (!(await source(ctx, p.orgId))) throw invalid('No sheet is connected');
+  await ctx.db.update(sheetSources).set({ columns }).where(where(p.orgId));
   await sync(ctx, p.orgId);
   return getDistributionPoints(ctx, p);
 }
