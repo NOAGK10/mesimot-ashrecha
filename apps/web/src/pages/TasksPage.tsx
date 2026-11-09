@@ -11,11 +11,11 @@ import { STATUS_LABEL, VIEW_LABEL, formatDate } from '../he';
  * Task list: my tasks, the organisation's, or one person's (profile page).
  * Kept simple: search and time tabs are always visible; the rest sits behind "סינון".
  */
-export function TasksPage({ scope, personId }: { scope: 'mine' | 'all' | 'person'; personId?: string }) {
+export function TasksPage({ scope, personId, initialView = 'all' }: { scope: 'mine' | 'all' | 'person'; personId?: string; initialView?: TaskView }) {
   const me = useMe();
   const isManager = me.data?.access === 'manager';
   const canCreate = isManager || me.data?.access === 'member';
-  const [view, setView] = useState<TaskView>('all');
+  const [view, setView] = useState<TaskView>(initialView);
   const [owner, setOwner] = useState('');
   const [status, setStatus] = useState<TaskStatus | ''>('');
   const [category, setCategory] = useState('');

@@ -20,7 +20,7 @@ function monthStart(d: Date, mode: Mode): Date {
 }
 
 /** Tasks by due date on a month grid, in the Hebrew or the Gregorian calendar. */
-export function CalendarView({ mine }: { mine: boolean }) {
+export function CalendarView({ mine, onPickDay }: { mine: boolean; onPickDay?: (isoDate: string) => void }) {
   const [mode, setMode] = useState<Mode>(() => {
     try {
       return localStorage.getItem('calendar-mode') === 'gregorian' ? 'gregorian' : 'hebrew';
@@ -56,9 +56,10 @@ export function CalendarView({ mine }: { mine: boolean }) {
       if (!t.dueDate) continue;
       m.set(t.dueDate, [...(m.get(t.dueDate) ?? []), t]);
     }
+    // Timed tasks first, by time; then the rest.
+    for (const list of m.values()) list.sort((a, b) => (a.dueTime ?? '99').localeCompare(b.dueTime ?? '99'));
     return m;
   }, [tasks.data]);
-  const undated = (tasks.data ?? []).filter((t) => !t.dueDate && t.status !== 'completed' && t.status !== 'cancelled').length;
 
   return (
     <div className="calendar">
@@ -76,11 +77,6 @@ export function CalendarView({ mine }: { mine: boolean }) {
           </button>
         </div>
         <div className="calendar-tools">
-          {undated > 0 && (
-            <Link to="/tasks?scope=org" className="muted small">
-              {undated} בלי תאריך
-            </Link>
-          )}
           <div className="segmented small-seg" role="group" aria-label="סוג לוח שנה">
             <button type="button" className={mode === 'hebrew' ? 'active' : ''} aria-pressed={mode === 'hebrew'} onClick={() => switchMode('hebrew')}>
               עברי
@@ -104,7 +100,13 @@ export function CalendarView({ mine }: { mine: boolean }) {
           const main = mode === 'hebrew' ? hebrewDay(d) : String(d.getDate());
           const other = mode === 'hebrew' ? String(d.getDate()) : hebrewDay(d);
           return (
-            <div key={keyOf(d)} role="gridcell" className={`calendar-cell${outside ? ' outside' : ''}${sameDay(d, today) ? ' today' : ''}`}>
+            <div
+              key={keyOf(d)}
+              role="gridcell"
+              className={`calendar-cell${outside ? ' outside' : ''}${sameDay(d, today) ? ' today' : ''}${onPickDay ? ' pickable' : ''}`}
+              onClick={(e) => onPickDay && !(e.target as HTMLElement).closest('a') && onPickDay(keyOf(d))}
+              title={onPickDay ? 'לחיצה – משימה חדשה ביום הזה' : undefined}
+            >
               <div className="calendar-date">
                 <strong>{main}</strong>
                 <span>{other}</span>
@@ -116,6 +118,7 @@ export function CalendarView({ mine }: { mine: boolean }) {
                   className={`calendar-task status-${t.status}${t.isOverdue ? ' overdue' : ''}`}
                   title={`${t.title} · ${STATUS_LABEL[t.status]}`}
                 >
+                  {t.dueTime && <span className="calendar-time">{t.dueTime}</span>}
                   {t.title}
                 </Link>
               ))}

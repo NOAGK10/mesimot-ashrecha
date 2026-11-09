@@ -666,3 +666,43 @@ button.danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--
 .call-when input { max-width: 240px; }
 .calls-empty { text-align: center; padding: 40px 16px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
 .calls-empty p { margin: 4px 0; }
+
+/* Tasks page toolbar */
+.tasks-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.tasks-toolbar .segmented { margin-bottom: 0; }
+.tasks-new { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+.calendar-cell { min-height: 110px; }
+.calendar-cell.pickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+.calendar-cell.pickable:hover { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.calendar-time { font-weight: 600; margin-inline-end: 4px; }
+
+/* New task window */
+.task-dialog { border: none; border-radius: 16px; padding: 0; width: min(560px, calc(100vw - 32px)); box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25); color: var(--text); background: var(--surface); }
+.task-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+.task-dialog-body { display: flex; flex-direction: column; gap: 16px; padding: 22px 22px 18px; }
+.task-dialog-body h2 { margin: 0 0 2px; font-size: 1.2rem; }
+.float-field { position: relative; display: block; margin: 0; }
+.float-field > input, .float-field > textarea, .float-field > select { width: 100%; padding: 12px 12px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font: inherit; }
+.float-field > input:focus, .float-field > textarea:focus, .float-field > select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.float-field > span { position: absolute; inset-inline-start: 12px; top: 12px; color: var(--muted); pointer-events: none; transition: all 0.12s; background: var(--surface); padding: 0 4px; }
+.float-field > input:focus + span, .float-field > input:not(:placeholder-shown) + span,
+.float-field > textarea:focus + span, .float-field > textarea:not(:placeholder-shown) + span,
+.float-field.has-value > span { top: -8px; font-size: 0.75rem; }
+.float-field > input:focus + span, .float-field > textarea:focus + span { color: var(--accent); }
+.hebrew-date { display: block; color: var(--muted); font-size: 0.75rem; margin-top: 4px; padding-inline-start: 4px; }
+.task-dialog-row { display: grid; grid-template-columns: 1.2fr 0.9fr 1.2fr; gap: 10px; align-items: start; }
+.check-line { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; }
+.check-line input { width: 18px; height: 18px; accent-color: var(--accent); }
+.repeat-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 36px; }
+.repeat-line select { width: auto; }
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500; position: relative; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-track { width: 38px; height: 22px; border-radius: 999px; background: #cbd5e1; position: relative; transition: background 0.15s; flex-shrink: 0; }
+.switch-track::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: inset-inline-start 0.15s; }
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track::after { inset-inline-start: 19px; }
+.switch input:focus-visible + .switch-track { box-shadow: 0 0 0 3px var(--accent-soft); }
+.task-dialog-actions { display: flex; gap: 14px; align-items: center; justify-content: flex-start; padding-top: 4px; }
+@media (max-width: 560px) { .task-dialog-row { grid-template-columns: 1fr 1fr; } .task-dialog-row > :last-child { grid-column: 1 / -1; } }
+.task-dialog .check-line, .task-dialog .switch { flex-direction: row; align-self: flex-start; align-items: center; width: auto; }
+.task-dialog .check-line input { width: 18px; flex: none; margin: 0; }

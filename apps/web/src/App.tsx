@@ -23,6 +23,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { PrivacyPage, TermsPage } from './pages/LegalPages';
 import { Icon, Sidebar, pageTitle } from './components/Sidebar';
 import { CalendarView } from './components/CalendarView';
+import { NewTaskDialog } from './components/NewTaskDialog';
 
 export function App() {
   const me = useMe();
@@ -111,35 +112,58 @@ export function App() {
   );
 }
 
-/** One tasks page with a "mine / organisation" switch instead of two menu items. */
+/**
+ * The tasks page: a month calendar first (click a day to add a task on it), plus "no date" and the full list.
+ * "Mine / organisation" applies to all three.
+ */
 function TasksHome() {
+  const me = useMe();
+  const canCreate = me.data?.access === 'manager' || me.data?.access === 'member';
   const [params, setParams] = useSearchParams();
   const scope = params.get('scope') === 'org' ? 'all' : 'mine';
-  const calendar = params.get('view') === 'calendar';
-  const go = (next: { scope?: 'org'; view?: 'calendar' }) => setParams(Object.fromEntries(Object.entries(next).filter(([, v]) => v)) as Record<string, string>);
-  const scopeParam = scope === 'all' ? ('org' as const) : undefined;
-  const viewParam = calendar ? ('calendar' as const) : undefined;
+  const view = params.get('view') === 'list' ? 'list' : params.get('view') === 'undated' ? 'undated' : 'calendar';
+  const [newOn, setNewOn] = useState<string | null | undefined>(undefined); // undefined = closed, null = no date
+  const go = (next: { scope?: 'all' | 'mine'; view?: 'calendar' | 'list' | 'undated' }) => {
+    const s = next.scope ?? scope;
+    const v = next.view ?? view;
+    setParams({ ...(s === 'all' ? { scope: 'org' } : {}), ...(v !== 'calendar' ? { view: v } : {}) });
+  };
   return (
     <>
-      <div className="tasks-switches">
-        <div className="segmented" role="tablist">
-          <button role="tab" aria-selected={scope === 'mine'} className={scope === 'mine' ? 'active' : ''} onClick={() => go({ view: viewParam })}>
-            המשימות שלי
+      <div className="tasks-toolbar">
+        {canCreate && (
+          <button type="button" className="tasks-new" onClick={() => setNewOn(null)}>
+            <Icon name="add" size={20} /> משימה חדשה
           </button>
-          <button role="tab" aria-selected={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => go({ scope: 'org', view: viewParam })}>
-            משימות הארגון
-          </button>
+        )}
+        <div className="segmented" role="tablist" aria-label="תצוגה">
+          {(
+            [
+              ['calendar', 'לוח'],
+              ['undated', 'ללא תאריך'],
+              ['list', 'רשימה'],
+            ] as const
+          ).map(([v, label]) => (
+            <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'active' : ''} onClick={() => go({ view: v })}>
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="segmented" role="group" aria-label="תצוגה">
-          <button type="button" aria-pressed={!calendar} className={!calendar ? 'active' : ''} onClick={() => go({ scope: scopeParam })}>
-            רשימה
+        <div className="segmented" role="tablist" aria-label="של מי">
+          <button role="tab" aria-selected={scope === 'mine'} className={scope === 'mine' ? 'active' : ''} onClick={() => go({ scope: 'mine' })}>
+            שלי
           </button>
-          <button type="button" aria-pressed={calendar} className={calendar ? 'active' : ''} onClick={() => go({ scope: scopeParam, view: 'calendar' })}>
-            לוח שנה
+          <button role="tab" aria-selected={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => go({ scope: 'all' })}>
+            כל הארגון
           </button>
         </div>
       </div>
-      {calendar ? <CalendarView key={scope} mine={scope === 'mine'} /> : <TasksPage key={scope} scope={scope} />}
+      {view === 'calendar' ? (
+        <CalendarView key={scope} mine={scope === 'mine'} onPickDay={canCreate ? (d) => setNewOn(d) : undefined} />
+      ) : (
+        <TasksPage key={scope + view} scope={scope} initialView={view === 'undated' ? 'undated' : 'all'} />
+      )}
+      {newOn !== undefined && <NewTaskDialog date={newOn} onClose={() => setNewOn(undefined)} />}
     </>
   );
 }

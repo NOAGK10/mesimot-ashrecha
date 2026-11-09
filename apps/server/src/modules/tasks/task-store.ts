@@ -52,6 +52,7 @@ export interface NewTask {
   description: string;
   ownerPersonId: string;
   dueDate: IsoDate | null;
+  dueTime?: string | null;
   participantIds: readonly string[];
   createdByPersonId: string | null;
   recurrence?: { definitionId: string; occurrenceDate: IsoDate };
@@ -75,6 +76,7 @@ export async function insertTask(tx: Db, t: NewTask, now: Date): Promise<TaskWit
       description: t.description,
       ownerPersonId: t.ownerPersonId,
       dueDate: t.dueDate,
+      dueTime: t.dueDate ? (t.dueTime ?? null) : null,
       categoryId: t.categoryId ?? null,
       visibility: t.visibility ?? 'org',
       createdByPersonId: t.createdByPersonId,
@@ -102,6 +104,7 @@ export function toTaskDto(t: TaskWithParticipants, today: IsoDate): TaskDto {
     status: t.status,
     ownerPersonId: t.ownerPersonId,
     dueDate: t.dueDate,
+    dueTime: t.dueTime,
     categoryId: t.categoryId,
     visibility: t.visibility,
     createdByPersonId: t.createdByPersonId,

@@ -40,13 +40,18 @@ export const updatePersonSchema = createPersonSchema.partial().extend({
 });
 
 // ---- Tasks ----
+const dueTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Time must be HH:MM');
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().max(20_000).default(''),
   ownerPersonId: uuid,
   dueDate: isoDate.nullable().default(null),
+  /** Optional time of day, "HH:MM". */
+  dueTime: dueTime.nullable().optional(),
   participantIds: z.array(uuid).max(100).default([]),
   categoryId: uuid.nullable().optional(),
+  /** Created already done (e.g. logging something that was handled). */
+  done: z.boolean().optional(),
   /** Absent = 'org'. */
   visibility: z.enum(TASK_VISIBILITIES).optional(),
 });
@@ -56,6 +61,7 @@ export const updateTaskSchema = z.object({
   description: z.string().max(20_000).optional(),
   ownerPersonId: uuid.optional(),
   dueDate: isoDate.nullable().optional(),
+  dueTime: dueTime.nullable().optional(),
   categoryId: uuid.nullable().optional(),
   visibility: z.enum(TASK_VISIBILITIES).optional(),
 });
@@ -434,6 +440,8 @@ export interface TaskDto {
   status: TaskStatus;
   ownerPersonId: string;
   dueDate: string | null;
+  /** "HH:MM" or null. */
+  dueTime: string | null;
   categoryId: string | null;
   visibility: TaskVisibility;
   createdByPersonId: string | null;

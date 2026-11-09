@@ -186,6 +186,8 @@ export const tasks = pgTable(
     status: taskStatus('status').notNull().default('new'),
     ownerPersonId: uuid('owner_person_id').notNull().references(() => people.id),
     dueDate: date('due_date', { mode: 'string' }),
+    /** Optional time of day, "HH:MM". */
+    dueTime: text('due_time'),
     categoryId: uuid('category_id').references(() => taskCategories.id, { onDelete: 'set null' }),
     recurrenceDefinitionId: uuid('recurrence_definition_id').references(() => recurrenceDefinitions.id),
     occurrenceDate: date('occurrence_date', { mode: 'string' }),

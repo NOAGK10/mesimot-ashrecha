@@ -61,14 +61,15 @@ export async function createTask(ctx: AppContext, p: Principal, input: z.output<
   return ctx.db.transaction(async (tx) => {
     await assertActivePeople(tx, p.orgId, [input.ownerPersonId, ...input.participantIds]);
     await assertTaskCategory(tx, p.orgId, input.categoryId);
-    const task = (await insertTask(tx, { ...input, visibility: input.visibility ?? 'org', orgId: p.orgId, createdByPersonId: p.personId }, now))!;
+    const { done, ...fields } = input;
+    const task = (await insertTask(tx, { ...fields, status: done ? 'completed' : 'new', visibility: input.visibility ?? 'org', orgId: p.orgId, createdByPersonId: p.personId }, now))!;
     await recordAudit(tx, {
       orgId: p.orgId,
       entityType: 'task',
       entityId: task.id,
       type: 'task.created',
       actor: actorOf(p),
-      data: { title: task.title, ownerPersonId: task.ownerPersonId, dueDate: task.dueDate, participantIds: task.participantIds, categoryId: task.categoryId, visibility: task.visibility },
+      data: { title: task.title, ownerPersonId: task.ownerPersonId, dueDate: task.dueDate, dueTime: task.dueTime, done: task.status === 'completed', participantIds: task.participantIds, categoryId: task.categoryId, visibility: task.visibility },
     });
     await notifyAssigned(tx, task, [task.ownerPersonId, ...task.participantIds], p.personId, now);
     await replanReminders(tx, reminderTarget(task), now);
@@ -104,6 +105,13 @@ export async function updateTask(ctx: AppContext, p: Principal, id: string, inpu
     if (input.dueDate !== undefined && input.dueDate !== task.dueDate) {
       patch.dueDate = input.dueDate;
       await audit('task.due_date_changed', { from: task.dueDate, to: input.dueDate });
+    }
+    // A time only makes sense with a date; clearing the date clears the time.
+    const nextDate = patch.dueDate !== undefined ? patch.dueDate : task.dueDate;
+    const nextTime = nextDate === null ? null : input.dueTime !== undefined ? input.dueTime : task.dueTime;
+    if (nextTime !== task.dueTime) {
+      patch.dueTime = nextTime;
+      await audit('task.due_time_changed', { from: task.dueTime, to: nextTime });
     }
     if (input.ownerPersonId !== undefined && input.ownerPersonId !== task.ownerPersonId) {
       // A member editing their own task cannot hand it to someone else.
