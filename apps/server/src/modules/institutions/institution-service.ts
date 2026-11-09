@@ -1,11 +1,10 @@
 import { asc, eq } from 'drizzle-orm';
 import type { InstitutionsDto } from '@org/shared';
 import type { AppContext } from '../../context';
-import { institutions, organizations, people } from '../../db/schema';
+import { institutions, organizations } from '../../db/schema';
 import { AppError, forbidden, invalid } from '../../lib/errors';
-import { driveIfConnected } from '../google/connection-service';
 import { parseGoogleUrl } from '../google/gateway';
-import { parseCsv } from '../imports/parse';
+import { readSheetRows as readSheet } from '../google/sheet-table';
 import { policy } from '../identity/policy';
 import type { Principal } from '../identity/principal';
 import { mapSheet } from './columns';
@@ -23,24 +22,6 @@ function assertCanView(p: Principal) {
 }
 
 const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
-
-const notAccessible = () =>
-  new AppError(400, 'sheet_not_accessible', 'The sheet is private. Share it as "Anyone with the link can view", or connect Google Drive first.');
-
-/** Reads the first tab: through the connecting manager's Google account if possible, otherwise the public export. */
-async function readSheet(ctx: AppContext, orgId: string, fileId: string, byPersonId: string | null): Promise<string[][]> {
-  if (byPersonId) {
-    const [by] = await ctx.db.select().from(people).where(eq(people.id, byPersonId));
-    if (by && !by.deactivatedAt) {
-      const drive = await driveIfConnected(ctx, { personId: by.id, orgId, access: 'manager', scopeTaskId: null } as Principal).catch(() => null);
-      const tables = drive ? await drive.api.readSpreadsheet(drive.refreshToken, fileId).catch(() => null) : null;
-      if (tables?.[0]) return tables[0].rows;
-    }
-  }
-  const csv = await ctx.publicSheets.fetchCsv(fileId).catch(() => null);
-  if (!csv) throw notAccessible();
-  return parseCsv('גיליון', csv).table.rows;
-}
 
 /** Replaces the list with the sheet's rows. On failure the old list stays and the error is recorded. */
 async function syncFromSheet(ctx: AppContext, orgId: string): Promise<void> {

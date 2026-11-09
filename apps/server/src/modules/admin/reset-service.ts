@@ -5,6 +5,7 @@ import {
   calls,
   financeEntries,
   institutions,
+  sheetContacts,
   organizations,
   chatReads,
   documentCategories,
@@ -76,9 +77,21 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
     await tx.update(organizations).set({ financeOpeningAgorot: 0 }).where(eq(organizations.id, org));
     // The institutions list and its sheet link (the sheet itself is not touched).
     await tx.delete(institutions).where(eq(institutions.orgId, org));
+    await tx.delete(sheetContacts).where(eq(sheetContacts.orgId, org));
     await tx
       .update(organizations)
-      .set({ institutionsSheetId: null, institutionsSheetBy: null, institutionsSyncedAt: null, institutionsSyncError: null, institutionsUnmatched: null })
+      .set({
+        institutionsSheetId: null,
+        institutionsSheetBy: null,
+        institutionsSyncedAt: null,
+        institutionsSyncError: null,
+        institutionsUnmatched: null,
+        contactsSheetId: null,
+        contactsSheetBy: null,
+        contactsSyncedAt: null,
+        contactsSyncError: null,
+        contactsUnmatched: null,
+      })
       .where(eq(organizations.id, org));
 
     // Profiles: feedback (its notifications and inbox items cascade) and "responsible for".

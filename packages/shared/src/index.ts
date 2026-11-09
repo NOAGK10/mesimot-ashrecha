@@ -612,3 +612,25 @@ export interface InstitutionsDto {
   items: InstitutionDto[];
 }
 export const institutionsSourceSchema = z.object({ url: z.url().max(2000) });
+
+// ---------------- Contacts (from a Google Sheet) ----------------
+
+export const SHEET_CONTACT_FIELDS = ['name', 'phone', 'email', 'responsible', 'address'] as const;
+export type SheetContactField = (typeof SHEET_CONTACT_FIELDS)[number];
+export interface SheetContactDto {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  /** Who in the organisation is responsible for this contact (as written in the sheet). */
+  responsible: string;
+  address: string;
+}
+export interface SheetContactsDto {
+  sheetUrl: string | null;
+  syncedAt: string | null;
+  syncError: string | null;
+  unmatchedColumns: string[];
+  canManage: boolean;
+  items: SheetContactDto[];
+}

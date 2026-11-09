@@ -798,3 +798,6 @@ a.inst-line:hover, .inst-contact a:hover { color: var(--accent); }
 .inst-notes { margin: 2px 0 0; font-size: 0.88rem; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .inst-connect { max-width: 640px; }
 .inst-columns { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+
+.sheet-avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem; flex-shrink: 0; }
+.contact-line.wrap { white-space: normal; overflow-wrap: anywhere; }

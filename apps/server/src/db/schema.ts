@@ -63,6 +63,12 @@ export const organizations = pgTable('organizations', {
   institutionsSyncedAt: ts('institutions_synced_at'),
   institutionsSyncError: text('institutions_sync_error'),
   institutionsUnmatched: jsonb('institutions_unmatched').$type<string[]>(),
+  /** The Google Sheet the contacts list is read from (same fields as the institutions sheet). */
+  contactsSheetId: text('contacts_sheet_id'),
+  contactsSheetBy: uuid('contacts_sheet_by'),
+  contactsSyncedAt: ts('contacts_synced_at'),
+  contactsSyncError: text('contacts_sync_error'),
+  contactsUnmatched: jsonb('contacts_unmatched').$type<string[]>(),
   createdAt: createdAt(),
 });
 
@@ -538,4 +544,20 @@ export const institutions = pgTable(
     notes: text('notes').notNull().default(''),
   },
   (t) => [index('institutions_org_idx').on(t.orgId, t.position)],
+);
+
+/** Contacts copied from the organisation's contacts Google Sheet; replaced on every update from it. */
+export const sheetContacts = pgTable(
+  'sheet_contacts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    position: integer('position').notNull(),
+    name: text('name').notNull(),
+    phone: text('phone').notNull().default(''),
+    email: text('email').notNull().default(''),
+    responsible: text('responsible').notNull().default(''),
+    address: text('address').notNull().default(''),
+  },
+  (t) => [index('sheet_contacts_org_idx').on(t.orgId, t.position)],
 );
