@@ -155,6 +155,13 @@
       "when": 1794252849889,
       "tag": "0021_sheet_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794253949495,
+      "tag": "0022_distribution_cells",
+      "breakpoints": true
     }
   ]
 }

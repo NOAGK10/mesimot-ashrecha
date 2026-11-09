@@ -29,7 +29,7 @@ export function pointFieldOf(header: string): Field | null {
 }
 
 export const mapPointsSheet = (raw: string[][], choice?: Partial<Record<Field, string | null>> | null) =>
-  mapSheetRows<Field>(raw, { fieldOf: pointFieldOf, order: ['name', 'phone', 'city', 'notes'], required: 'name' }, choice);
+  mapSheetRows<Field>(raw, { fieldOf: pointFieldOf, order: ['name', 'phone', 'city', 'notes'], required: 'name', keepAll: true }, choice);
 
 const where = (orgId: string) => and(eq(sheetSources.orgId, orgId), eq(sheetSources.kind, KIND));
 const source = async (ctx: AppContext, orgId: string) => (await ctx.db.select().from(sheetSources).where(where(orgId)))[0] ?? null;
@@ -40,11 +40,11 @@ async function sync(ctx: AppContext, orgId: string): Promise<void> {
   try {
     const m = mapPointsSheet(await readSheetRows(ctx, orgId, src.sheetId, src.byPersonId, src.gid), src.columns);
     const { rows, extras } = m;
-    const stats = { rowsInSheet: m.dataRows, loaded: rows.length, skipped: m.skipped, columns: m.chosen };
+    const stats = { rowsInSheet: m.dataRows, loaded: rows.length, skipped: m.skipped, columns: m.chosen, headers: m.headers };
     await ctx.db.transaction(async (tx) => {
       await tx.delete(distributionPoints).where(eq(distributionPoints.orgId, orgId));
       for (let i = 0; i < rows.length; i += 500) {
-        await tx.insert(distributionPoints).values(rows.slice(i, i + 500).map((r, j) => ({ ...r, extra: extras[i + j] ?? [], orgId, position: i + j })));
+        await tx.insert(distributionPoints).values(rows.slice(i, i + 500).map((r, j) => ({ ...r, extra: extras[i + j] ?? [], cells: m.cells[i + j] ?? [], orgId, position: i + j })));
       }
       // Other columns are shown on each card, so none are reported as "not shown".
       await tx.update(sheetSources).set({ syncedAt: ctx.now(), syncError: null, unmatched: [], stats }).where(where(orgId));
@@ -66,13 +66,14 @@ export async function getDistributionPoints(ctx: AppContext, p: Principal): Prom
   }
   const rows = await ctx.db.select().from(distributionPoints).where(eq(distributionPoints.orgId, p.orgId)).orderBy(asc(distributionPoints.position));
   return {
-    stats: src?.stats && policy.isManager(p) ? { ...src.stats, manual: !!src.columns } : null,
+    headers: src?.stats?.headers ?? [],
+    stats: src?.stats && policy.isManager(p) ? { rowsInSheet: src.stats.rowsInSheet, loaded: src.stats.loaded, skipped: src.stats.skipped, columns: src.stats.columns, manual: !!src.columns } : null,
     sheetUrl: src ? sheetLink(src.sheetId, src.gid) : null,
     syncedAt: src?.syncedAt?.toISOString() ?? null,
     syncError: src?.syncError ?? null,
     unmatchedColumns: src?.unmatched ?? [],
     canManage: policy.isManager(p),
-    items: rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, city: r.city, notes: r.notes, extra: r.extra ?? [] })),
+    items: rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, city: r.city, notes: r.notes, extra: r.extra ?? [], cells: r.cells ?? [] })),
   };
 }
 

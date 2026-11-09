@@ -24,7 +24,7 @@ describe('distribution points from a Google Sheet', () => {
   it('recognises the headers', () => {
     expect(['שם', 'טלפון', 'עיר', 'הערות'].map(pointFieldOf)).toEqual(['name', 'phone', 'city', 'notes']);
     expect(['שם המוקד', 'נייד', 'יישוב', 'האם יש הערות'].map(pointFieldOf)).toEqual(['name', 'phone', 'city', 'notes']);
-    expect(mapPointsSheet([['מוקד הרצל', '050-1', 'חולון', 'רק בימי שלישי']]).rows[0]).toEqual({ name: 'מוקד הרצל', phone: '050-1', city: 'חולון', notes: 'רק בימי שלישי' });
+    expect(mapPointsSheet([['שם המוקד', 'נייד', 'יישוב', 'האם יש הערות'], ['מוקד הרצל', '050-1', 'חולון', 'רק בימי שלישי']]).rows[0]).toEqual({ name: 'מוקד הרצל', phone: '050-1', city: 'חולון', notes: 'רק בימי שלישי' });
   });
 
   it('a manager connects the sheet, the team sees the points, updates replace them', async () => {
@@ -75,7 +75,14 @@ describe('distribution points from a Google Sheet', () => {
       ]),
     );
     const auto = await setDistributionSheet(h.ctx, h.manager, `https://docs.google.com/spreadsheets/d/${ID}/edit`);
-    expect(auto.stats).toMatchObject({ rowsInSheet: 3, loaded: 1, skipped: 2, manual: false, columns: { name: 'שם', phone: 'טלפון' } });
+    // Every row is kept (the list is shown as the sheet's table), even when the name column is empty.
+    expect(auto.stats).toMatchObject({ rowsInSheet: 3, loaded: 3, skipped: 0, manual: false, columns: { name: 'שם', phone: 'טלפון' } });
+    expect(auto.headers).toEqual(['עמודה 1', 'שם', 'טלפון', 'עיר', 'הערות']);
+    expect(auto.items.map((i) => i.cells)).toEqual([
+      ['משפחת כהן', 'בארון חשמל', '050-1', 'אלעד', 'בערב'],
+      ['משפחת לוי', '', '050-2', 'אלעד', ''],
+      ['משפחת כץ', '', '050-3', 'צפת', ''],
+    ]);
     expect((await getDistributionPoints(h.ctx, h.member)).stats).toBeNull(); // managers only
 
     const preview = await previewDistributionColumns(h.ctx, h.manager);
@@ -88,7 +95,7 @@ describe('distribution points from a Google Sheet', () => {
     expect(chosen.stats).toMatchObject({ rowsInSheet: 3, loaded: 3, skipped: 0, manual: true });
     // It stays chosen on updates; null goes back to automatic.
     expect((await refreshDistributionPoints(h.ctx, h.manager)).items).toHaveLength(3);
-    expect((await setDistributionColumns(h.ctx, h.manager, null)).items).toHaveLength(1);
+    expect((await setDistributionColumns(h.ctx, h.manager, null)).items).toHaveLength(3);
     await expect(setDistributionColumns(h.ctx, h.member, null)).rejects.toMatchObject({ status: 403 });
   });
 

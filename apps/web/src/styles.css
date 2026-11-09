@@ -893,3 +893,17 @@ a.inst-line:hover, .inst-contact a:hover { color: var(--accent); }
 .cols-badge { display: block; font-size: 0.7rem; color: var(--accent-strong); font-weight: 600; }
 .cols-preview tr.skipped td { color: var(--muted); opacity: 0.55; }
 @media (max-width: 640px) { .cols-grid { grid-template-columns: 1fr 1fr; } }
+
+/* A list shown as the Google Sheet it comes from */
+.sheet-wrap { overflow: auto; max-height: calc(100vh - 260px); border: 1px solid #c7c7c7; border-radius: 6px; background: #fff; }
+.sheet-table { border-collapse: separate; border-spacing: 0; font-size: 0.86rem; min-width: 100%; color: #202124; }
+.sheet-table th, .sheet-table td { border-inline-end: 1px solid #e2e3e3; border-bottom: 1px solid #e2e3e3; padding: 4px 8px; text-align: start; vertical-align: top; max-width: 320px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sheet-table thead th { position: sticky; top: 0; z-index: 2; background: #f1f3f4; font-weight: 600; border-bottom: 1px solid #c7c7c7; white-space: nowrap; }
+.sheet-table .sheet-num { position: sticky; inset-inline-start: 0; z-index: 1; background: #f8f9fa; color: #5f6368; text-align: center; font-size: 0.78rem; min-width: 38px; width: 38px; border-inline-end: 1px solid #c7c7c7; }
+.sheet-table thead .sheet-num { z-index: 3; background: #f1f3f4; }
+.sheet-table tbody tr:hover td { background: #f5f8ff; }
+.sheet-table tbody tr:hover td.sheet-num { background: #e8eefb; }
+.sheet-table tr.has-notes td.sheet-num { box-shadow: inset -3px 0 0 #e05a2b; }
+.sheet-table td.sheet-note { background: #fff7f2; }
+.sheet-table a { color: #1a73e8; text-decoration: none; white-space: nowrap; }
+.inst-bar .segmented { margin-bottom: 0; }

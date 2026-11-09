@@ -23,6 +23,21 @@ export function DistributionPage() {
   const [onlyNotes, setOnlyNotes] = useState(false);
   const [changing, setChanging] = useState(false);
   const [choosing, setChoosing] = useState(false);
+  const [view, setView] = useState<'table' | 'cards'>(() => {
+    try {
+      return localStorage.getItem('distribution-view') === 'cards' ? 'cards' : 'table';
+    } catch {
+      return 'table';
+    }
+  });
+  const switchView = (v: 'table' | 'cards') => {
+    setView(v);
+    try {
+      localStorage.setItem('distribution-view', v);
+    } catch {
+      /* fine */
+    }
+  };
 
   const items = data.data?.items ?? [];
   const cities = useMemo(() => [...new Set(items.map((i) => i.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'he')), [items]);
@@ -34,7 +49,9 @@ export function DistributionPage() {
       (i) =>
         (!city || i.city === city) &&
         (!onlyNotes || i.notes) &&
-        (!term || [i.name, i.city, i.notes, ...i.extra.map(([, v]) => v)].some((v) => v.toLowerCase().includes(term)) || (digits !== '' && i.phone.replace(/\D/g, '').includes(digits))),
+        (!term ||
+          [i.name, i.city, i.notes, ...i.extra.map(([, v]) => v), ...i.cells].some((v) => v.toLowerCase().includes(term)) ||
+          (digits !== '' && [i.phone, ...i.cells].some((v) => v.replace(/\D/g, '').includes(digits)))),
     );
   }, [items, q, city, onlyNotes]);
 
@@ -46,7 +63,15 @@ export function DistributionPage() {
   return (
     <section className="inst-page">
       <div className="inst-bar">
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש לפי שם, עיר, טלפון או הערה" aria-label="חיפוש" />
+        <div className="segmented" role="tablist" aria-label="תצוגה">
+          <button type="button" role="tab" aria-selected={view === 'table'} className={view === 'table' ? 'active' : ''} onClick={() => switchView('table')}>
+            טבלה
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'cards'} className={view === 'cards' ? 'active' : ''} onClick={() => switchView('cards')}>
+            כרטיסים
+          </button>
+        </div>
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש בכל העמודות" aria-label="חיפוש" />
         {cities.length > 1 && (
           <select value={city} onChange={(e) => setCity(e.target.value)} aria-label="סינון לפי עיר">
             <option value="">כל הערים</option>
@@ -90,11 +115,12 @@ export function DistributionPage() {
       {choosing && <ColumnsDialog onClose={() => setChoosing(false)} />}
 
       {items.length > 0 && shown.length === 0 && <p className="muted">אין מוקדים שמתאימים לחיפוש.</p>}
-      <ul className="plain inst-grid">
+      {view === 'table' && shown.length > 0 && <SheetTable headers={d.headers} rows={shown} phoneColumn={d.stats?.columns.phone} notesColumn={d.stats?.columns.notes} />}
+      {view === 'cards' && <ul className="plain inst-grid">
         {shown.map((i) => (
           <li key={i.id} className={`inst-card${i.notes ? ' has-notes' : ''}`}>
             <div className="inst-head">
-              <strong className="inst-name">{i.name}</strong>
+              <strong className="inst-name">{i.name || <span className="muted">(ללא שם)</span>}</strong>
               {i.city && <span className="job-tag">{i.city}</span>}
             </div>
             {i.phone && (
@@ -122,8 +148,67 @@ export function DistributionPage() {
             )}
           </li>
         ))}
-      </ul>
+      </ul>}
     </section>
+  );
+}
+
+const looksLikePhone = (v: string) => /^[\d\s+()*#-]{7,}$/.test(v) && v.replace(/\D/g, '').length >= 7;
+
+/** The list exactly as the sheet: its header row, its columns in order, row numbers and grid lines. */
+function SheetTable({
+  headers,
+  rows,
+  phoneColumn,
+  notesColumn,
+}: {
+  headers: string[];
+  rows: DistributionPointsDto['items'];
+  phoneColumn?: string;
+  notesColumn?: string;
+}) {
+  // Columns without a header and without any value are left out, like an unused column in the sheet.
+  const width = Math.max(headers.length, ...rows.map((r) => r.cells.length));
+  const cols = Array.from({ length: width }, (_, i) => i).filter((i) => (headers[i] ?? '').trim() || rows.some((r) => r.cells[i]));
+  const notesAt = notesColumn ? headers.indexOf(notesColumn) : -1;
+  if (rows.every((r) => r.cells.length === 0)) {
+    return <p className="muted small">לחצו "עדכון עכשיו" כדי לטעון את הטבלה מהקובץ.</p>;
+  }
+  return (
+    <div className="sheet-wrap">
+      <table className="sheet-table">
+        <thead>
+          <tr>
+            <th className="sheet-num" aria-label="מספר שורה" />
+            {cols.map((c) => (
+              <th key={c}>{headers[c] || ''}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, n) => (
+            <tr key={r.id} className={notesAt >= 0 && r.cells[notesAt] ? 'has-notes' : ''}>
+              <td className="sheet-num">{n + 1}</td>
+              {cols.map((c) => {
+                const v = r.cells[c] ?? '';
+                const phone = v && (headers[c] === phoneColumn || looksLikePhone(v));
+                return (
+                  <td key={c} className={c === notesAt && v ? 'sheet-note' : ''}>
+                    {phone ? (
+                      <a href={telHref(v)} dir="ltr">
+                        {v}
+                      </a>
+                    ) : (
+                      v
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

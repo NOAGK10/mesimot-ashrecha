@@ -730,6 +730,8 @@ export interface DistributionPointDto {
   notes: string;
   /** The sheet's other columns for this point (e.g. neighbourhood, street), as [header, value]. */
   extra: [string, string][];
+  /** The whole row as in the sheet, in the order of DistributionPointsDto.headers. */
+  cells: string[];
 }
 /** What the site read from a sheet: shown to managers, so a wrong column is easy to spot. */
 export interface SheetReadStats {
@@ -756,6 +758,8 @@ export const distributionColumnsSchema = z.object({
     .nullable(),
 });
 export interface DistributionPointsDto {
+  /** The sheet's header row, to show the list as the sheet's own table. */
+  headers: string[];
   stats: SheetReadStats | null;
   sheetUrl: string | null;
   syncedAt: string | null;

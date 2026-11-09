@@ -42,6 +42,8 @@ export interface SheetSpec<F extends string> {
   order: readonly F[];
   /** Rows without this field are skipped; the header row must name it. */
   required: F;
+  /** Keep every non-empty row even without the required field (lists shown as the sheet's own table). */
+  keepAll?: boolean;
 }
 
 export interface MappedRows<F extends string> {
@@ -58,6 +60,8 @@ export interface MappedRows<F extends string> {
   skipped: number;
   /** The first rows under the header, as read. */
   sample: string[][];
+  /** Per kept row: all its cells, in the sheet's column order (as many as there are headers). */
+  cells: string[][];
 }
 
 /** A manager's choice: for each field, the header of its column (null = not in the sheet). */
@@ -100,6 +104,11 @@ export function mapSheetRows<F extends string>(raw: string[][], spec: SheetSpec<
       }
     }
   }
+  if (headerAt < 0 && spec.keepAll && raw.length) {
+    // Shown as the sheet's table: the first row is the header even if no column was recognised.
+    headerAt = 0;
+    columns = raw[0]!.map(spec.fieldOf);
+  }
   const used = new Set<F>();
   if (headerAt >= 0) {
     // One column per field: the first one wins.
@@ -122,13 +131,17 @@ export function mapSheetRows<F extends string>(raw: string[][], spec: SheetSpec<
     });
     return { row, extra };
   });
-  const kept = mapped.filter((m) => m.row[spec.required]);
+  const width = Math.max(header.length, ...body.map((r) => r.length), 0);
+  const keep = body.map((r, i) => (spec.keepAll ? true : !!mapped[i]!.row[spec.required]));
+  const kept = mapped.filter((_, i) => keep[i]);
+  const cells = body.filter((_, i) => keep[i]).map((r) => Array.from({ length: width }, (_, i) => (r[i] ?? '').trim().slice(0, 2000)));
   const chosenOut = Object.fromEntries(spec.order.map((f) => [f, header[columns.indexOf(f)]?.trim() ?? ''])) as Record<F, string>;
   return {
     rows: kept.map((m) => m.row),
     unmatched,
     extras: kept.map((m) => m.extra),
-    headers: header.map((h) => h.trim()),
+    headers: Array.from({ length: Math.max(header.length, width) }, (_, i) => (header[i] ?? '').trim()),
+    cells,
     chosen: chosenOut,
     dataRows: body.length,
     skipped: body.length - kept.length,

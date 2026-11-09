@@ -659,7 +659,7 @@ export const sheetSources = pgTable(
     /** A manager's choice of columns (field → header); null = recognised automatically. */
     columns: jsonb('columns').$type<Record<string, string | null>>(),
     /** What the last update read: rows in the sheet, loaded, skipped and the columns used. */
-    stats: jsonb('stats').$type<{ rowsInSheet: number; loaded: number; skipped: number; columns: Record<string, string> }>(),
+    stats: jsonb('stats').$type<{ rowsInSheet: number; loaded: number; skipped: number; columns: Record<string, string>; headers?: string[] }>(),
   },
   (t) => [primaryKey({ columns: [t.orgId, t.kind] })],
 );
@@ -677,6 +677,8 @@ export const distributionPoints = pgTable(
     notes: text('notes').notNull().default(''),
     /** The sheet's other columns, as [header, value] pairs. */
     extra: jsonb('extra').$type<[string, string][]>().notNull().default([]),
+    /** The whole row as in the sheet. */
+    cells: jsonb('cells').$type<string[]>().notNull().default([]),
   },
   (t) => [index('distribution_points_org_idx').on(t.orgId, t.position)],
 );

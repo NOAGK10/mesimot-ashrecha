@@ -1,0 +1,1 @@
+ALTER TABLE "distribution_points" ADD COLUMN "cells" jsonb DEFAULT '[]'::jsonb NOT NULL;
