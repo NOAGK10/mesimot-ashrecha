@@ -671,6 +671,8 @@ export const distributionPoints = pgTable(
     phone: text('phone').notNull().default(''),
     city: text('city').notNull().default(''),
     notes: text('notes').notNull().default(''),
+    /** The sheet's other columns, as [header, value] pairs. */
+    extra: jsonb('extra').$type<[string, string][]>().notNull().default([]),
   },
   (t) => [index('distribution_points_org_idx').on(t.orgId, t.position)],
 );

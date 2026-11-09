@@ -47,6 +47,8 @@ export interface SheetSpec<F extends string> {
 export interface MappedRows<F extends string> {
   rows: Record<F, string>[];
   unmatched: string[];
+  /** Per row (same order as rows): the non-empty cells of unrecognised columns, as [header, value]. */
+  extras: [string, string][][];
 }
 
 /** Finds the header row (within the first rows), maps columns to fields and returns the data rows. */
@@ -73,16 +75,20 @@ export function mapSheetRows<F extends string>(raw: string[][], spec: SheetSpec<
   } else {
     columns = [...spec.order];
   }
-  const unmatched = headerAt >= 0 ? raw[headerAt]!.filter((h, i) => h.trim() && !columns[i]) : [];
-  const rows = raw
-    .slice(headerAt + 1)
-    .map((r) => {
-      const row = Object.fromEntries(spec.order.map((f) => [f, ''])) as Record<F, string>;
-      columns.forEach((f, i) => {
-        if (f) row[f] = (r[i] ?? '').trim().slice(0, 2000);
-      });
-      return row;
-    })
-    .filter((r) => r[spec.required]);
-  return { rows, unmatched };
+  const header = headerAt >= 0 ? raw[headerAt]! : [];
+  const unmatched = header.filter((h, i) => h.trim() && !columns[i]);
+  const mapped = raw.slice(headerAt + 1).map((r) => {
+    const row = Object.fromEntries(spec.order.map((f) => [f, ''])) as Record<F, string>;
+    columns.forEach((f, i) => {
+      if (f) row[f] = (r[i] ?? '').trim().slice(0, 2000);
+    });
+    const extra: [string, string][] = [];
+    header.forEach((h, i) => {
+      const v = (r[i] ?? '').trim();
+      if (h.trim() && !columns[i] && v) extra.push([h.trim().slice(0, 100), v.slice(0, 1000)]);
+    });
+    return { row, extra };
+  });
+  const kept = mapped.filter((m) => m.row[spec.required]);
+  return { rows: kept.map((m) => m.row), unmatched, extras: kept.map((m) => m.extra) };
 }

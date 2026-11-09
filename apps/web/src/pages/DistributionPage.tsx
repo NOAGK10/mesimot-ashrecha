@@ -33,7 +33,7 @@ export function DistributionPage() {
       (i) =>
         (!city || i.city === city) &&
         (!onlyNotes || i.notes) &&
-        (!term || [i.name, i.city, i.notes].some((v) => v.toLowerCase().includes(term)) || (digits !== '' && i.phone.replace(/\D/g, '').includes(digits))),
+        (!term || [i.name, i.city, i.notes, ...i.extra.map(([, v]) => v)].some((v) => v.toLowerCase().includes(term)) || (digits !== '' && i.phone.replace(/\D/g, '').includes(digits))),
     );
   }, [items, q, city, onlyNotes]);
 
@@ -57,12 +57,16 @@ export function DistributionPage() {
           </select>
         )}
         {withNotes > 0 && (
-          <label className="check-line small">
-            <input type="checkbox" checked={onlyNotes} onChange={(e) => setOnlyNotes(e.target.checked)} />
-            רק עם הערות ({withNotes})
-          </label>
+          <button type="button" aria-pressed={onlyNotes} className={`cc-chip${onlyNotes ? ' active' : ''}`} onClick={() => setOnlyNotes((v) => !v)}>
+            {onlyNotes ? '✓ ' : ''}רק עם הערות <span>{withNotes}</span>
+          </button>
         )}
-        <span className="muted small">{shown.length === items.length ? `${items.length} מוקדים` : `${shown.length} מתוך ${items.length}`}</span>
+        <span className="muted small">{shown.length === items.length ? `${items.length} מוקדים` : `מוצגים ${shown.length} מתוך ${items.length} מוקדים`}</span>
+        {shown.length !== items.length && (
+          <button type="button" className="link small" onClick={() => (setQ(''), setCity(''), setOnlyNotes(false))}>
+            הצגת הכול
+          </button>
+        )}
       </div>
       <SheetSourceBar info={d} cfg={CFG} onReplace={() => setChanging(true)} />
 
@@ -78,6 +82,16 @@ export function DistributionPage() {
               <a className="inst-line" href={telHref(i.phone)} dir="ltr">
                 📞 {i.phone}
               </a>
+            )}
+            {i.extra.length > 0 && (
+              <dl className="dp-extra">
+                {i.extra.map(([k, v]) => (
+                  <div key={k}>
+                    <dt>{k.replace(/[?:]\s*$/, '')}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+              </dl>
             )}
             {i.notes ? (
               <p className="dp-notes">

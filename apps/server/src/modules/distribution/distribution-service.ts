@@ -37,13 +37,14 @@ async function sync(ctx: AppContext, orgId: string): Promise<void> {
   const src = await source(ctx, orgId);
   if (!src) return;
   try {
-    const { rows, unmatched } = mapPointsSheet(await readSheetRows(ctx, orgId, src.sheetId, src.byPersonId, src.gid));
+    const { rows, extras } = mapPointsSheet(await readSheetRows(ctx, orgId, src.sheetId, src.byPersonId, src.gid));
     await ctx.db.transaction(async (tx) => {
       await tx.delete(distributionPoints).where(eq(distributionPoints.orgId, orgId));
       for (let i = 0; i < rows.length; i += 500) {
-        await tx.insert(distributionPoints).values(rows.slice(i, i + 500).map((r, j) => ({ ...r, orgId, position: i + j })));
+        await tx.insert(distributionPoints).values(rows.slice(i, i + 500).map((r, j) => ({ ...r, extra: extras[i + j] ?? [], orgId, position: i + j })));
       }
-      await tx.update(sheetSources).set({ syncedAt: ctx.now(), syncError: null, unmatched }).where(where(orgId));
+      // Other columns are shown on each card, so none are reported as "not shown".
+      await tx.update(sheetSources).set({ syncedAt: ctx.now(), syncError: null, unmatched: [] }).where(where(orgId));
     });
   } catch (e) {
     const message = e instanceof AppError ? e.message : 'The sheet could not be read';
@@ -67,7 +68,7 @@ export async function getDistributionPoints(ctx: AppContext, p: Principal): Prom
     syncError: src?.syncError ?? null,
     unmatchedColumns: src?.unmatched ?? [],
     canManage: policy.isManager(p),
-    items: rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, city: r.city, notes: r.notes })),
+    items: rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, city: r.city, notes: r.notes, extra: r.extra ?? [] })),
   };
 }
 

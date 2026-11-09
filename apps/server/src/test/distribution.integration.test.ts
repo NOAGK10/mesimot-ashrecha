@@ -44,6 +44,15 @@ describe('distribution points from a Google Sheet', () => {
     expect((await refreshDistributionPoints(h.ctx, h.manager)).items).toHaveLength(3);
   });
 
+  it("shows the sheet's other columns on each point", async () => {
+    const ID = 'extraColsSheet0001';
+    h.fakeDrive.publicCsv.set(ID, csv([['שם', 'טלפון', 'עיר', 'שכונה / אזור', 'רחוב', 'קיבלו?', 'הערות'], ['משפחת פנחסוב', '054-1', 'אלעד', 'מרכז', 'רבי עקיבא 3', 'כן', ''], ['רום', '', 'ירושלים', '', '', '', 'בערב']]));
+    const r = await setDistributionSheet(h.ctx, h.manager, `https://docs.google.com/spreadsheets/d/${ID}/edit`);
+    expect(r.items[0]!.extra).toEqual([['שכונה / אזור', 'מרכז'], ['רחוב', 'רבי עקיבא 3'], ['קיבלו?', 'כן']]);
+    expect(r.items[1]!.extra).toEqual([]);
+    expect(r.unmatchedColumns).toEqual([]);
+  });
+
   it('is separate from the other sheet lists, and closed to guests; only managers connect', async () => {
     expect((await getSheetContacts(h.ctx, h.manager)).sheetUrl).toBeNull();
     await expect(getDistributionPoints(h.ctx, h.guest)).rejects.toMatchObject({ status: 403 });
@@ -51,10 +60,12 @@ describe('distribution points from a Google Sheet', () => {
   });
 
   it('if the sheet becomes unreadable the last list stays, with the reason', async () => {
+    const before = (await getDistributionPoints(h.ctx, h.manager)).items.length;
+    expect(before).toBeGreaterThan(0);
     h.fakeDrive.publicCsv.clear();
     await expect(refreshDistributionPoints(h.ctx, h.manager)).rejects.toMatchObject({ status: 400 });
     const r = await getDistributionPoints(h.ctx, h.manager);
-    expect(r.items).toHaveLength(3);
+    expect(r.items).toHaveLength(before);
     expect(r.syncError).toMatch(/private/);
   });
 });

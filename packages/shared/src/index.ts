@@ -728,6 +728,8 @@ export interface DistributionPointDto {
   phone: string;
   city: string;
   notes: string;
+  /** The sheet's other columns for this point (e.g. neighbourhood, street), as [header, value]. */
+  extra: [string, string][];
 }
 export interface DistributionPointsDto {
   sheetUrl: string | null;
