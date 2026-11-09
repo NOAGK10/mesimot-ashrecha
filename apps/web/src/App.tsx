@@ -16,6 +16,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { CallsPage } from './pages/CallsPage';
 import { FinancePage } from './pages/FinancePage';
 import { ContactsPage } from './pages/ContactsPage';
+import { InstitutionsPage } from './pages/InstitutionsPage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage, useInbox } from './pages/HomePage';
 import { Avatar } from './components/Avatar';
@@ -86,7 +87,7 @@ export function App() {
         <UserMenu name={me.data.displayName} personId={me.data.personId} isManager={isManager} />
       </header>
       <div className="side-backdrop" onClick={() => setMenuOpen(false)} />
-      <Sidebar isManager={isManager} onNavigate={() => setMenuOpen(false)} />
+      <Sidebar isManager={isManager} isTeam={canCreate} onNavigate={() => setMenuOpen(false)} />
       <main className="content">
         <Routes>
           <Route path="/home" element={<HomePage />} />
@@ -109,6 +110,7 @@ export function App() {
           {isManager && <Route path="/calls" element={<CallsPage />} />}
           {isManager && <Route path="/finance" element={<FinancePage />} />}
           <Route path="/contacts" element={<ContactsPage />} />
+          {canCreate && <Route path="/institutions" element={<InstitutionsPage />} />}
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>

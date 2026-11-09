@@ -56,6 +56,13 @@ export const organizations = pgTable('organizations', {
   dueSoonDays: smallint('due_soon_days').notNull().default(1),
   /** The organisation's money before the first finance report, in agorot. */
   financeOpeningAgorot: bigint('finance_opening_agorot', { mode: 'number' }).notNull().default(0),
+  /** The Google Sheet the institutions list is read from. */
+  institutionsSheetId: text('institutions_sheet_id'),
+  /** The manager who connected it; their Google connection is used to read a private sheet. */
+  institutionsSheetBy: uuid('institutions_sheet_by'),
+  institutionsSyncedAt: ts('institutions_synced_at'),
+  institutionsSyncError: text('institutions_sync_error'),
+  institutionsUnmatched: jsonb('institutions_unmatched').$type<string[]>(),
   createdAt: createdAt(),
 });
 
@@ -510,4 +517,25 @@ export const financeEntries = pgTable(
     deletedByPersonId: uuid('deleted_by_person_id').references(() => people.id),
   },
   (t) => [index('finance_entries_org_idx').on(t.orgId, t.occurredOn), check('finance_amount_positive', sql`${t.amountAgorot} > 0`)],
+);
+
+// ---------------- Institutions ----------------
+
+/** Yeshivas / kollels, copied from the organisation's Google Sheet; replaced on every update from it. */
+export const institutions = pgTable(
+  'institutions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id').notNull().references(() => organizations.id),
+    position: integer('position').notNull(),
+    name: text('name').notNull(),
+    city: text('city').notNull().default(''),
+    address: text('address').notNull().default(''),
+    phone: text('phone').notNull().default(''),
+    contactName: text('contact_name').notNull().default(''),
+    contactPhone: text('contact_phone').notNull().default(''),
+    contactEmail: text('contact_email').notNull().default(''),
+    notes: text('notes').notNull().default(''),
+  },
+  (t) => [index('institutions_org_idx').on(t.orgId, t.position)],
 );

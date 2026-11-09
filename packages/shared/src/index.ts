@@ -583,3 +583,32 @@ export interface FinanceSummaryDto {
   canSetOpening: boolean;
   entries: FinanceEntryDto[];
 }
+
+// ---------------- Institutions (from a Google Sheet) ----------------
+
+export const INSTITUTION_FIELDS = ['name', 'city', 'address', 'phone', 'contactName', 'contactPhone', 'contactEmail', 'notes'] as const;
+export type InstitutionField = (typeof INSTITUTION_FIELDS)[number];
+
+export interface InstitutionDto {
+  id: string;
+  name: string;
+  city: string;
+  address: string;
+  phone: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  notes: string;
+}
+export interface InstitutionsDto {
+  /** Link to the connected sheet, or null when none is connected yet. */
+  sheetUrl: string | null;
+  syncedAt: string | null;
+  /** Why the last update from the sheet failed (it keeps the previous data). */
+  syncError: string | null;
+  /** Columns in the sheet that were not recognised. */
+  unmatchedColumns: string[];
+  canManage: boolean;
+  items: InstitutionDto[];
+}
+export const institutionsSourceSchema = z.object({ url: z.url().max(2000) });

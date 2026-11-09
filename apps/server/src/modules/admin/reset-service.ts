@@ -4,6 +4,7 @@ import {
   auditEvents,
   calls,
   financeEntries,
+  institutions,
   organizations,
   chatReads,
   documentCategories,
@@ -73,6 +74,12 @@ export async function resetContent(ctx: AppContext, p: Principal, confirmation: 
     const deletedCalls = await tx.delete(calls).where(eq(calls.orgId, org)).returning({ id: calls.id });
     const deletedFinance = await tx.delete(financeEntries).where(eq(financeEntries.orgId, org)).returning({ id: financeEntries.id });
     await tx.update(organizations).set({ financeOpeningAgorot: 0 }).where(eq(organizations.id, org));
+    // The institutions list and its sheet link (the sheet itself is not touched).
+    await tx.delete(institutions).where(eq(institutions.orgId, org));
+    await tx
+      .update(organizations)
+      .set({ institutionsSheetId: null, institutionsSheetBy: null, institutionsSyncedAt: null, institutionsSyncError: null, institutionsUnmatched: null })
+      .where(eq(organizations.id, org));
 
     // Profiles: feedback (its notifications and inbox items cascade) and "responsible for".
     const deletedFeedback = await tx.delete(personFeedback).where(eq(personFeedback.orgId, org)).returning({ id: personFeedback.id });
