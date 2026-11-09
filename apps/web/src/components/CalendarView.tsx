@@ -34,7 +34,7 @@ export function CalendarView({ mine }: { mine: boolean }) {
 
   const switchMode = (m: Mode) => {
     setMode(m);
-    setAnchor(monthStart(anchor, m));
+    setAnchor(monthStart(addDays(anchor, 14), m)); // the middle of the month on screen
     try {
       localStorage.setItem('calendar-mode', m);
     } catch {
