@@ -44,6 +44,14 @@ const optionLabel = (p: PersonDto) => (p.jobTitle ? `${p.displayName} · ${p.job
 /** An error whose message is already written for the user (in Hebrew). */
 export class UserError extends Error {}
 
+/** Hebrew for server messages that people commonly see. */
+const HEBREW_MESSAGES: Record<string, string> = {
+  'A person with this e-mail already exists': 'כבר יש באתר אדם עם המייל הזה. אפשר למצוא אותו ברשימה ולערוך את הפרטים שלו.',
+  'The organization must keep at least one active manager': 'בארגון חייב להישאר לפחות מנהל פעיל אחד.',
+  'A category with this name already exists': 'כבר יש קטגוריה בשם הזה.',
+  'Validation failed': 'חלק מהפרטים לא תקינים. בדקו את השדות ונסו שוב.',
+};
+
 export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
   const message =
@@ -52,7 +60,7 @@ export function ErrorText({ error }: { error: unknown }) {
         ? 'מישהו אחר עדכן את המשימה בינתיים. הנתונים רועננו — נסו שוב.'
         : error.status === 403
           ? 'אין הרשאה לפעולה הזו.'
-          : error.message
+          : (HEBREW_MESSAGES[error.message] ?? error.message)
       : error instanceof UserError
         ? error.message
         : 'אירעה שגיאה.';

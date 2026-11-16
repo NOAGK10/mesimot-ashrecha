@@ -36,3 +36,18 @@ describe('contacts', () => {
     expect(updateProfileSchema.safeParse({ phone: 'abc' }).success).toBe(false);
   });
 });
+
+describe('adding someone who was removed', () => {
+  it('brings them back with the new details instead of "e-mail already exists"', async () => {
+    const { createPerson, deletePerson, listPeople } = await import('../modules/identity/people-service');
+    const added = await createPerson(h.ctx, h.manager, { displayName: 'יעל', email: 'yael@example.org', role: 'member', jobTitle: null });
+    await deletePerson(h.ctx, h.manager, added.id);
+    expect((await listPeople(h.ctx, h.manager)).some((p) => p.id === added.id)).toBe(false);
+
+    const back = await createPerson(h.ctx, h.manager, { displayName: 'יעל כהן', email: 'Yael@Example.org', role: 'guest', jobTitle: 'רכזת' });
+    expect(back).toMatchObject({ id: added.id, displayName: 'יעל כהן', role: 'guest', jobTitle: 'רכזת', active: true });
+    expect((await listPeople(h.ctx, h.manager)).filter((p) => p.email === 'yael@example.org')).toHaveLength(1);
+    // Someone still in the organisation: still an error.
+    await expect(createPerson(h.ctx, h.manager, { displayName: 'x', email: 'yael@example.org', role: null, jobTitle: null })).rejects.toMatchObject({ status: 409 });
+  });
+});

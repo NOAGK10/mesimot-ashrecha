@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { PersonDto, createPersonSchema, updatePersonSchema } from '@org/shared';
 import { OPEN_STATUSES, defaultAvatarColor } from '@org/shared';
@@ -106,6 +106,21 @@ async function countActiveManagers(db: Db, orgId: string): Promise<number> {
 export async function createPerson(ctx: AppContext, p: Principal, input: z.output<typeof createPersonSchema>): Promise<PersonDto> {
   if (!policy.canManagePeople(p)) throw forbidden();
   return ctx.db.transaction(async (tx) => {
+    // Someone removed earlier keeps their row (history shows their name), so adding the same e-mail
+    // again brings that person back with the new details instead of failing.
+    const [removed] = await tx
+      .select()
+      .from(people)
+      .where(and(eq(people.orgId, p.orgId), sql`lower(${people.email}) = ${input.email.toLowerCase()}`, isNotNull(people.deletedAt)));
+    if (removed) {
+      const [row] = await tx
+        .update(people)
+        .set({ displayName: input.displayName, role: input.role, jobTitle: input.jobTitle, deletedAt: null, deactivatedAt: null })
+        .where(eq(people.id, removed.id))
+        .returning();
+      await recordAudit(tx, { orgId: p.orgId, entityType: 'person', entityId: removed.id, type: 'person.restored', actor: actorOf(p), data: { ...input } });
+      return toDto(row!, true);
+    }
     await assertEmailFree(tx, p.orgId, input.email);
     const [row] = await tx.insert(people).values({ ...input, email: input.email.toLowerCase(), orgId: p.orgId }).returning();
     await recordAudit(tx, { orgId: p.orgId, entityType: 'person', entityId: row!.id, type: 'person.created', actor: actorOf(p), data: { ...input } });
