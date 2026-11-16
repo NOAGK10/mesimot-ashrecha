@@ -1,12 +1,12 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import type { AppContext } from '../../context';
-import { auditEvents, chatMessages, inboxItems, notifications, people, personFeedback } from '../../db/schema';
+import { auditEvents, chatMessages, chatReads, inboxItems, notifications, people, personFeedback } from '../../db/schema';
 import { todayIn } from '../../lib/dates';
 import { getOrg } from '../identity/org';
 import { issueMagicLink } from '../identity/auth-service';
 import { isOpen } from '../tasks/lifecycle';
 import { loadTask } from '../tasks/task-store';
-import { buildEmail, buildSocialEmail, type NotificationKind } from './email-content';
+import { buildEmail, buildSocialEmail, buildUnreadChatEmail, type NotificationKind } from './email-content';
 import type { MailMessage } from './mailer';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -69,6 +69,7 @@ export async function dispatchDueNotifications(ctx: AppContext): Promise<{ sent:
 /** Returns null when the message is no longer relevant (task closed, person removed, …). */
 async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMessage | null> {
   if (n.kind === 'mention' || n.kind === 'feedback') return buildSocialMessage(ctx, n);
+  if (n.kind === 'chat_unread') return buildUnreadChatMessage(ctx, n);
   if (!n.taskId) return null;
   const task = await loadTask(ctx.db, n.taskId);
   const [person] = await ctx.db.select().from(people).where(eq(people.id, n.personId));
@@ -96,6 +97,45 @@ async function buildMessage(ctx: AppContext, n: NotificationRow): Promise<MailMe
     statusNote: note,
     url,
     today: todayIn(org.timezone, ctx.now()),
+  });
+}
+
+/**
+ * E-mail for private messages the person has not read yet. Nothing is sent if they already read
+ * the conversation, or if everything unread was deleted.
+ */
+async function buildUnreadChatMessage(ctx: AppContext, n: NotificationRow): Promise<MailMessage | null> {
+  if (!n.messageId) return null;
+  const [person] = await ctx.db.select().from(people).where(eq(people.id, n.personId));
+  if (!person || person.deactivatedAt || person.deletedAt || person.role === null) return null;
+  const [first] = await ctx.db.select().from(chatMessages).where(eq(chatMessages.id, n.messageId));
+  if (!first?.dmKey) return null;
+  const [read] = await ctx.db
+    .select({ lastReadId: chatReads.lastReadId })
+    .from(chatReads)
+    .where(and(eq(chatReads.personId, person.id), eq(chatReads.channelKey, `dm:${first.dmKey}`)));
+  const unread = await ctx.db
+    .select({ id: chatMessages.id, body: chatMessages.body, authorPersonId: chatMessages.authorPersonId, attachmentId: chatMessages.attachmentId })
+    .from(chatMessages)
+    .where(
+      and(
+        eq(chatMessages.dmKey, first.dmKey),
+        isNull(chatMessages.deletedAt),
+        ne(chatMessages.authorPersonId, person.id),
+        gt(chatMessages.id, read?.lastReadId ?? 0),
+      ),
+    )
+    .orderBy(asc(chatMessages.id));
+  if (unread.length === 0) return null;
+  const senderId = unread[0]!.authorPersonId;
+  const [sender] = await ctx.db.select({ name: people.displayName }).from(people).where(eq(people.id, senderId));
+  const org = await getOrg(ctx.db, n.orgId);
+  return buildUnreadChatEmail({
+    orgName: org.name,
+    to: { name: person.displayName, email: person.email },
+    senderName: sender?.name ?? 'מישהו',
+    messages: unread.map((m) => m.body.trim() || (m.attachmentId ? '📎 קובץ מצורף' : '')).filter(Boolean),
+    url: `${ctx.config.APP_URL}/chat?with=${senderId}`,
   });
 }
 

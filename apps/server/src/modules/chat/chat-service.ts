@@ -13,7 +13,7 @@ import {
 } from '@org/shared';
 import type { AppContext } from '../../context';
 import type { Db } from '../../db/client';
-import { chatAttachments, chatMentions, chatMessages, chatReads, people } from '../../db/schema';
+import { chatAttachments, chatMentions, chatMessages, chatReads, notifications, people } from '../../db/schema';
 import { forbidden, invalid, notFound } from '../../lib/errors';
 import { policy } from '../identity/policy';
 import type { Principal } from '../identity/principal';
@@ -314,6 +314,7 @@ export async function postMessage(ctx: AppContext, p: Principal, input: PostMess
     }
     // Sending a message means the sender has read the conversation up to it.
     await markReadIn(tx, p, channelKey(channel), message!.id, ctx.now());
+    if (channel.kind === 'dm') await queueUnreadEmail(tx, p, channel.otherPersonId, channel.key, message!.id, ctx.now());
     const [dto] = await withDetails(tx, p, [message!]);
     return dto!;
   });
@@ -340,6 +341,38 @@ export async function getAttachment(ctx: AppContext, p: Principal, id: number): 
   const [a] = await ctx.db.select().from(chatAttachments).where(eq(chatAttachments.id, id));
   if (!a) throw notFound('File');
   return { fileName: a.fileName, mimeType: a.mimeType, data: Buffer.from(a.dataBase64, 'base64') };
+}
+
+/** How long a private message may stay unread before it is e-mailed. */
+export const UNREAD_EMAIL_DELAY_MINUTES = 10;
+
+/**
+ * Queues one "you have unread messages" e-mail per conversation: if one is already waiting for this
+ * person in this conversation, it will cover the new message too. The dispatcher drops it if the
+ * person reads the conversation in the meantime.
+ */
+async function queueUnreadEmail(tx: Db, p: Principal, toPersonId: string, dmKey: string, messageId: number, now: Date): Promise<void> {
+  const [waiting] = await tx
+    .select({ id: notifications.id })
+    .from(notifications)
+    .innerJoin(chatMessages, eq(chatMessages.id, notifications.messageId))
+    .where(
+      and(
+        eq(notifications.personId, toPersonId),
+        eq(notifications.kind, 'chat_unread'),
+        inArray(notifications.status, ['pending', 'sending']),
+        eq(chatMessages.dmKey, dmKey),
+      ),
+    )
+    .limit(1);
+  if (waiting) return;
+  await tx.insert(notifications).values({
+    orgId: p.orgId,
+    personId: toPersonId,
+    kind: 'chat_unread',
+    messageId,
+    sendAt: new Date(now.getTime() + UNREAD_EMAIL_DELAY_MINUTES * 60_000),
+  });
 }
 
 async function markReadIn(db: Db, p: Principal, key: string, lastId: number, now: Date): Promise<void> {

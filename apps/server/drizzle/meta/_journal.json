@@ -162,6 +162,13 @@
       "when": 1794253949495,
       "tag": "0022_distribution_cells",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794852083155,
+      "tag": "0023_chat_unread_email",
+      "breakpoints": true
     }
   ]
 }

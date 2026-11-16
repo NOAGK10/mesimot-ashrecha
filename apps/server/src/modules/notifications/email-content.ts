@@ -146,3 +146,34 @@ export function buildSocialEmail(i: SocialEmailInput): MailMessage {
 </div>`;
   return { to: i.to.email, subject, text, html };
 }
+
+export interface UnreadChatEmailInput {
+  orgName: string;
+  to: { name: string; email: string };
+  senderName: string;
+  /** The unread messages, oldest first. */
+  messages: string[];
+  url: string;
+}
+
+/** E-mail for private chat messages that were not read. Shows the last few messages. */
+export function buildUnreadChatEmail(i: UnreadChatEmailInput): MailMessage {
+  const count = i.messages.length;
+  const what = count === 1 ? 'הודעה אחת שלא קראת' : `${count} הודעות שלא קראת`;
+  const subject = `${i.orgName} · ${what} מ${i.senderName}`;
+  const intro = `יש לך ${what} בצ'אט מ${i.senderName}:`;
+  const shown = i.messages.slice(-5).map((m) => clip(m, 400));
+  const more = count > shown.length ? `ועוד ${count - shown.length} הודעות קודמות…` : '';
+  const button = 'לפתיחת השיחה';
+
+  const text = [`שלום ${i.to.name},`, '', intro, '', ...(more ? [more] : []), ...shown.map((m) => `> ${m}`), '', `${button}: ${i.url}`, '', 'בהצלחה,', i.orgName].join('\n');
+  const html = `<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1c2230;max-width:560px">
+<p style="margin:0 0 12px">שלום ${escapeHtml(i.to.name)},</p>
+<p style="margin:0 0 12px">${escapeHtml(intro)}</p>
+${more ? `<p style="margin:0 0 8px;color:#5f6b7a">${escapeHtml(more)}</p>` : ''}
+${shown.map((m) => `<div style="border-inline-start:4px solid #2456c9;background:#f6f7f9;border-radius:6px;padding:8px 14px;margin:0 0 8px;white-space:pre-wrap">${escapeHtml(m)}</div>`).join('\n')}
+<p style="margin:16px 0 20px"><a href="${escapeHtml(i.url)}" style="background:#2456c9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${button}</a></p>
+<p style="margin:0">בהצלחה,<br>${escapeHtml(i.orgName)}</p>
+</div>`;
+  return { to: i.to.email, subject, text, html };
+}

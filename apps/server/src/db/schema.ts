@@ -42,7 +42,7 @@ export const personRole = pgEnum('person_role', PERSON_ROLES);
 export const recurrenceMode = pgEnum('recurrence_mode', RECURRENCE_MODES);
 export const recurrenceFreq = pgEnum('recurrence_freq', RECURRENCE_FREQS);
 export const recurrenceState = pgEnum('recurrence_state', RECURRENCE_STATES);
-export const notificationKind = pgEnum('notification_kind', ['assigned', 'due_soon', 'due_today', 'overdue', 'mention', 'feedback']);
+export const notificationKind = pgEnum('notification_kind', ['assigned', 'due_soon', 'due_today', 'overdue', 'mention', 'feedback', 'chat_unread']);
 export const notificationStatus = pgEnum('notification_status', ['pending', 'sending', 'sent', 'cancelled', 'failed']);
 export const actorType = pgEnum('actor_type', ['person', 'system']);
 
